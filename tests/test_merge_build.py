@@ -5,7 +5,7 @@ import zipfile
 
 import pytest
 
-from baike2yomitan.build import build, structured_content
+from baike2yomitan.build import TITLE_FULL, TITLE_LEX, build, default_title, structured_content
 from baike2yomitan.merge import merge
 from baike2yomitan.records import Record, RecordWriter, iter_records
 from baike2yomitan.sense import sense_rank_key
@@ -134,7 +134,7 @@ def test_build_validate_and_smoke(tmp_path):
         names = set(zf.namelist())
         assert names == {"index.json", "tag_bank_1.json", "term_bank_1.json"}
         idx = json.loads(zf.read("index.json"))
-        assert idx["title"] == "百度百科 (full)" and idx["format"] == 3 and idx["sequenced"] is True
+        assert idx["title"] == TITLE_FULL and idx["format"] == 3 and idx["sequenced"] is True
         assert idx["sourceLanguage"] == "zh" and idx["targetLanguage"] == "zh"
         bank = json.loads(zf.read("term_bank_1.json"))
         by_title = {}
@@ -154,3 +154,24 @@ def test_build_validate_and_smoke(tmp_path):
     results = smoke(str(out), extra_random=1, seed=0)
     assert len(results["红色食品"]) == 1 and len(results["丈夫"]) == 2
     assert results["舍利子"] == []
+
+
+def test_default_title_follows_cedict_filter(tmp_path):
+    assert default_title(None) == TITLE_FULL == "百度百科 (full)"
+    assert default_title({"红色食品"}) == TITLE_LEX == "百度百科 (lexical)"
+    assert default_title(set()) == TITLE_LEX  # an empty filter is still a filter
+    _write(tmp_path / "r.jsonl", [
+        _primary("红色食品", 10, "红色食品是指食品为红色、橙红色或棕红色的食品。"),
+        _primary("丰颐", 2036679, "丰颐，汉语词语，拼音是fēng yí，意思是丰满的下巴。"),
+    ])
+    out = tmp_path / "lex.zip"
+    stats = build(str(tmp_path / "r.jsonl"), str(out), cedict_words={"丰颐"})
+    assert stats["entries"] == 1
+    with zipfile.ZipFile(out) as zf:
+        idx = json.loads(zf.read("index.json"))
+        bank = json.loads(zf.read("term_bank_1.json"))
+    assert idx["title"] == TITLE_LEX
+    assert [e[0] for e in bank] == ["丰颐"]
+    build(str(tmp_path / "r.jsonl"), str(tmp_path / "named.zip"), title="自定义", cedict_words={"丰颐"})
+    with zipfile.ZipFile(tmp_path / "named.zip") as zf:
+        assert json.loads(zf.read("index.json"))["title"] == "自定义"  # an explicit title wins

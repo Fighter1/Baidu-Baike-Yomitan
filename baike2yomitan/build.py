@@ -21,6 +21,9 @@ BANK_SIZE = 10_000
 DICT_TAG = "百科"
 _MUTED = {"fontSize": "80%", "color": "#888888"}
 
+TITLE_FULL = "百度百科 (full)"
+TITLE_LEX = "百度百科 (lexical)"
+
 
 def _cjk(text: str) -> bool:
     return any("一" <= ch <= "鿿" for ch in text)
@@ -189,13 +192,20 @@ def _sense_key(rec: dict) -> tuple:
     return (rec.get("lemma_id"), rec.get("sense_label") or "", (rec.get("summary") or "")[:40])
 
 
-def build(records_path: str, out_zip: str, title: str = "百度百科 (full)",
+def default_title(cedict_words: set[str] | None) -> str:
+    """A build filtered to CC-CEDICT headwords is the lexical dictionary;
+    anything else is the full one."""
+    return TITLE_LEX if cedict_words is not None else TITLE_FULL
+
+
+def build(records_path: str, out_zip: str, title: str | None = None,
           pinyin: bool = False, traditional: str | None = None, infobox: bool = False,
           cedict_words: set[str] | None = None, exclude_tags: set[str] | None = None,
           merged: bool | None = None, revision: str | None = None,
           update_base_url: str | None = None) -> collections.Counter:
     stats: collections.Counter = collections.Counter()
     t0 = time.time()
+    title = title or default_title(cedict_words)
     stem = os.path.splitext(os.path.basename(out_zip))[0]
     revision = check_revision(revision or default_revision())
     to_pinyin = Pinyin() if pinyin else None
