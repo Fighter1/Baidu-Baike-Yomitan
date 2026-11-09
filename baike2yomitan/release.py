@@ -149,6 +149,9 @@ def release_notes(zips: list[str], indexes: list[dict], stats_dir: str = os.path
               "**Update:** the zips are self-updating; Yomitan → Settings → Dictionaries → *Check for updates*.",
               "", "Content is Baidu Baike user-contributed material mirrored by third parties "
               "(lars1234/baidu-baike-dataset, mohamedah/baidu_baike); each entry links to its Baike article."]
+    if any("CC-CEDICT" in (i.get("attribution") or "") for i in indexes):
+        lines[-1] += (" Readings are taken from [CC-CEDICT](https://cc-cedict.org/) (CC BY-SA 4.0) "
+                      "where it lists the headword.")
     return "\n".join(lines) + "\n"
 
 

@@ -116,5 +116,6 @@ def test_build_uses_the_readings(cedict_path, tmp_path):
     stats = build(str(tmp_path / "r.jsonl"), str(out), pinyin=True, readings_cedict=cedict_path, pinyin_overrides=None)
     with zipfile.ZipFile(out) as zf:
         got = {e[0]: e[1] for e in json.loads(zf.read("term_bank_1.json"))}
+        assert "CC-CEDICT" in json.loads(zf.read("index.json"))["attribution"]  # CC BY-SA attribution
     assert got == {"不粘锅": "bù zhān guō", "自郐以下": "zì kuài yǐ xià", "红色食品": "hóng sè shí pǐn"}
     assert (stats["reading:cedict"], stats["reading:article"], stats["reading:pypinyin"]) == (1, 1, 1)

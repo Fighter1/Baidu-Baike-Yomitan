@@ -3,6 +3,22 @@
 Build importable [Yomitan](https://github.com/yomidevs/yomitan) dictionaries
 (term bank format 3) from offline copies of Baidu Baike.
 
+## Download
+
+Ready-made zips are attached to the
+[latest release](https://github.com/Fighter1/Baidu-Baike-Yomitan/releases/latest):
+
+| file | dictionary title | what it is |
+|---|---|---|
+| `baike-full.zip` | `百度百科 (full)` | every article that survived extraction: 4.9 M senses, 8.8 M entries with the traditional headwords, about 1.4 GB |
+| `baike-lexical.zip` | `百度百科 (lexical)` | only titles that are CC-CEDICT headwords, minus people, companies and schools: about 160 k entries, 26 MB |
+
+Import either one in Yomitan → Settings → Dictionaries → *Import*. Both are
+self-updating: later releases arrive through *Check for updates*. Entries are
+Chinese-Chinese, with pinyin, a traditional and a simplified headword, an
+optional infobox table and a link back to the article. The rest of this file
+is about building them yourself.
+
 The pipeline is source-agnostic: a thin per-source `extract` step writes a
 common JSONL record format, and `merge`, `build` and `validate` know nothing
 about where records came from. Adding a new source (Baidu's Baike API, an MDX
@@ -15,7 +31,8 @@ file, …) means writing one more extractor that emits the same records.
 | `563w` (primary) | `lars1234/baidu-baike-dataset`, one 16.8 GB JSON Lines file, 5.63 M entries, crawled ~2019 | title, summary (or first paragraph of the first section), tags, `/view/<id>` lemma id |
 | `hf` (overlay, optional) | `mohamedah/baidu_baike`, Internet Archive snapshots 2020–2024, 588 k rows, parquet on `refs/convert/parquet` (~2.2 GB) | title, subtitle (= sense label), abstract, lemma id from `/item/<title>/<id>`, archive URL and snapshot date |
 
-Nothing is ever requested from baike.baidu.com. CC-CEDICT comes from the MDBG
+Nothing is ever requested from baike.baidu.com. CC-CEDICT (used to pick the
+lexical headwords and as the first source of readings) comes from the MDBG
 export; the Yomitan JSON schemas come from the yomitan GitHub repo.
 
 ## Setup
@@ -81,13 +98,15 @@ python -X utf8 -m baike2yomitan release --dry-run        # upload dist zips as a
 ```
 
 `all` runs extract (both sources with `--overlay-hf`), merge, both builds,
-validation, the smoke test and a 20-record sample. `--limit N` on `extract`
-stops after N input rows for fast iteration.
+validation, the smoke test and a 20-record sample; it downloads CC-CEDICT when
+it is missing. `--limit N` on `extract` stops after N input rows for fast
+iteration. `inputs` and `release` are described in their own sections below.
 
 ### Flags
 
 | flag | step | effect |
 |---|---|---|
+| `--overlay-hf` | all | also extract the `hf` overlay and merge it into the primary records |
 | `--limit N` | extract, all | stop after N input rows (fast iteration) |
 | `--skip-verify`, `--no-hash` | extract, all | skip the pinned-input check, or check sizes only |
 | `inputs pin\|verify\|download [--source 563w\|hf]` | inputs | maintain `data/source-inputs.json` (see *Downloading the corpora*) |
@@ -98,15 +117,16 @@ stops after N input rows for fast iteration.
 | `--readings-cedict PATH\|none` | build, all | CC-CEDICT export to take readings from; default is the `--cedict` file, else `data/cedict/…` when present |
 | `--traditional s2t\|s2twp\|s2hk` | build, all | also emit a traditional-script headword for every entry whose OpenCC conversion differs from the simplified title; same content and sequence number |
 | `--infobox` | build, all | render the extracted infobox pairs (first six) as a two-column table under the summary |
-| `--cedict PATH` | build | keep only records whose title is a simplified CC-CEDICT headword (the lexical build); `all` downloads the MDBG export when missing |
+| `--cedict PATH` | build, all | `build`: keep only records whose title is a simplified CC-CEDICT headword (the lexical build). `all`: where the MDBG export lives (default `data/cedict/…`, downloaded when missing); it always builds both zips |
 | `--exclude-tags a,b` | build, all | drop records carrying any of these Baike tags; `all` applies it to the lexical build only |
-| `--title` | build | override the dictionary title stored in `index.json` |
+| `--title` | build | override the dictionary title stored in `index.json` (default `百度百科 (full)`, or `百度百科 (lexical)` with `--cedict`) |
 | `--revision R` | build, all | `index.json` revision; dot-separated integers only (default: today plus `.1`, e.g. `2026.11.09.1`) |
 | `--update-url BASE\|github` | build, all | make the zip self-updating: `index.json` gets `isUpdatable` + `indexUrl`/`downloadUrl` under `BASE`; `github` derives `https://github.com/<owner>/<repo>/releases/latest/download` from the `origin` remote |
 | `--repo`, `--tag`, `--title`, `--notes-file`, `--draft`, `--dry-run` | release | see *Self-updating dictionaries* below |
 | `--no-validate` | build, all | skip the schema check after building (~45 min for the full zip) |
 | `--engine auto\|fast\|jsonschema` | validate | fastjsonschema when installed (default), or the reference implementation |
 | `--schemas-dir`, `--seed` | build, validate, smoke, sample | where the Yomitan schemas are cached; seed for the random smoke/sample picks |
+| `--random N` | smoke | how many random headwords to look up besides the fixed ones |
 
 ### What gets dropped, and what gets flagged
 
@@ -159,12 +179,17 @@ Outputs (figures from the 2026-11-09 release build, `--pinyin --traditional s2t 
 - `data/records.jsonl` (4.72 M records), `data/records.hf.jsonl` (383 k), `data/records.merged.jsonl` (4.89 M) — one JSON record per sense
 - `data/extract_report.md` — drop counts by reason, quality flags, merge counts, heuristics notes
 - `data/short_summary_examples.md` — sampled analysis of the under-15-character drops that motivated the paragraph-walking fallback
-- `dist/baike-full.zip` — everything that survived extraction: 8.8 M entries (incl. 3.9 M traditional headwords), 882 term banks, ~1.3 GB
-- `dist/baike-lexical.zip` — only titles that are simplified CC-CEDICT headwords (103 k records), minus `--exclude-tags 人物,企业,学校`: 160 k entries, 25 MB
+- `dist/baike-full.zip` — everything that survived extraction: 8.8 M entries (incl. 3.9 M traditional headwords), 882 term banks, ~1.4 GB
+- `dist/baike-lexical.zip` — only titles that are simplified CC-CEDICT headwords (103 k records), minus `--exclude-tags 人物,企业,学校`: 160 k entries, 26 MB
+- `dist/<name>.index.json` — a copy of each zip's `index.json`, written when `--update-url` is given (see *Self-updating dictionaries*)
+- `data/stats/*.json` — the counters behind the report and the release notes
+
+Each zip holds `index.json`, `styles.css` and `term_bank_N.json` files of
+10,000 entries; there is no tag bank, because entries carry no tags.
 
 Wall-clock on this machine: primary extract ~8.5 min, overlay extract ~6 min,
-merge ~2 min, full build ~4 min (~8.5 min with `--pinyin`), full-zip validation
-~45 min (fastjsonschema).
+merge ~2 min, full build ~4 min (~10.5 min with `--pinyin`), lexical build
+~1 min, full-zip validation ~45 min (fastjsonschema).
 
 ### Merge semantics
 
@@ -198,12 +223,20 @@ reference implementation.
 ## Importing into Yomitan
 
 Yomitan → Settings → Dictionaries → *Import* → pick `dist/baike-full.zip`
-(and/or `dist/baike-lexical.zip`). Each zip is a separate dictionary with a
-distinct title, `百度百科 (full)` and `百度百科 (lexical)`; enable whichever you
-want in the dictionary list. Entries carry no term tags; the dictionary-title
+(and/or `dist/baike-lexical.zip`), built locally or downloaded from the
+release. Each zip is a separate dictionary with a distinct title,
+`百度百科 (full)` and `百度百科 (lexical)`; enable whichever you want in the
+dictionary list. The lexical one is a subset of the full one, so enabling both
+shows those entries twice. Entries carry no term tags; the dictionary-title
 chip Yomitan draws already names the source. Headwords are simplified; with
-`--traditional` the same
-entries are also reachable from traditional-script text.
+`--traditional` the same entries are also reachable from traditional-script
+text.
+
+An entry shows, top to bottom: the traditional and simplified spellings (with
+`--traditional`), the sense label when the article has one, the
+summary, the infobox table (with `--infobox`, first six rows), and a footer
+with the article link, the archive snapshot link and date when the text came
+from the overlay, and up to five Baike tags.
 
 ### Showing simplified and traditional together
 
@@ -218,7 +251,7 @@ only the spelling that was looked up. `index.json` sets `sequenced: true`, which
 the merge mode requires.
 
 With `--pinyin` the reading (`yí mín`) is attached to both spellings; the
-traditional chip reuses the pinyin computed from the simplified title.
+traditional headword reuses the reading chosen for the simplified title.
 
 Independently of the grouping mode, every entry built with `--traditional`
 opens with both spellings in small boxes, traditional (red) then simplified
@@ -241,7 +274,9 @@ record from the best source available (`baike2yomitan/readings.py`):
    when it splits into exactly one syllable per character and every
    syllable is a reading that character really has;
 4. the same, borrowed from another sense of the same title;
-5. **pypinyin**, a per-character guess helped by a phrase list.
+5. **pypinyin**, a per-character guess helped by a phrase list. CC-CEDICT's
+   words are added to that list, so a longer title containing one
+   (`不粘锅炒饭`) inherits its reading.
 
 On the merged records, about 102 k records are CC-CEDICT headwords and
 another 102 k state a fitting pinyin; the two sources agree with each other
@@ -251,7 +286,17 @@ for example `不粘锅` read `nián` instead of `zhān`). The remaining titles,
 mostly names of people, places and works, still get the guess, so a
 polyphonic character in such a title can be wrong; add the word to the
 overrides file to pin it. The build statistics count each source
-(`reading:cedict`, `reading:article`, `reading:pypinyin`, …).
+(`reading:cedict`, `reading:article`, `reading:pypinyin`, …); in the full
+build that is 103 k from CC-CEDICT, 103 k from article pinyin and 4.53 M
+guessed, with 148 k titles that contain no Chinese character left without a
+reading.
+
+Readings are lower-case, tone-marked syllables separated by spaces. Those
+from CC-CEDICT follow its conventions: citation tones (no sandhi on 一/不),
+neutral tones unmarked (`yī tā hú tu`) and erhua as a bare `r` (`rén r`).
+Without CC-CEDICT (`--readings-cedict none`, or a plain `build` before the
+file has been downloaded) source 2 and the phrase help in 5 are skipped; a
+`build` that finds no CC-CEDICT file says so.
 
 ## Self-updating dictionaries (GitHub Releases)
 
@@ -262,10 +307,8 @@ with the installed one and offers the `downloadUrl` zip when it is newer.
 Revisions are compared numerically only when both are dot-separated integers
 with the same number of segments, which is why the builder always writes four:
 `Y.M.D.N` (`2026.11.09.1` locally; the GitHub Actions build uses the run number
-as `N`). Pass `--revision` to override, and keep four segments. (The first
-release, `2026.11.08`, had three; Yomitan falls back to a string comparison
-when the counts differ, and for every later date that comparison still orders
-correctly.)
+as `N`). Pass `--revision` to override, and keep four segments: Yomitan falls
+back to a plain string comparison when the segment counts differ.
 
 GitHub's `…/releases/latest/download/<asset>` URL always points at the newest
 non-draft release, so it is a stable target for both fields. The flow:
@@ -290,7 +333,8 @@ with the same content. `release` then, through the `gh` CLI:
 
 1. checks the zips exist and are under GitHub's 2 GiB asset limit;
 2. resolves the repository (`--repo owner/name`, else the `origin` remote) and
-   requires that the logged-in `gh` account has write access to it;
+   requires that the logged-in `gh` account has write access to it and that
+   the repository has at least one commit (a release needs a tag);
 3. notes whether the repository is private — Yomitan cannot download assets
    from a private repository (it sends no auth header), so auto-update only
    works from a public one;
@@ -298,7 +342,8 @@ with the same content. `release` then, through the `gh` CLI:
    match that repository (otherwise it tells you the exact `build` command to
    re-run), and regenerates the sidecar from the zip;
 5. writes release notes to `dist/<tag>.notes.md` from `data/stats` (entry
-   counts, sizes, record counts) unless `--notes-file` is given;
+   counts, sizes, record counts) and the pinned input commits in
+   `data/source-inputs.json`, unless `--notes-file` is given;
 6. runs `gh release create <tag> <zips> <sidecars> --latest` (tag defaults to
    `v<revision>`, `--draft` for a draft), or `gh release upload --clobber` plus
    `gh release edit --latest` when the tag already exists.
@@ -319,14 +364,19 @@ Three workflows under `.github/workflows/`:
 | `build-release.yml` | manual only (*Actions → Build and release → Run workflow*) | frees runner disk, downloads the pinned corpora, runs `all` with `--update-url github` and revision `UTC-date.run-number`, uploads the reports as an artifact and publishes the release as *latest*. Inputs: `publish` (off keeps the zips as a 7-day artifact instead), `skip_validation`, `revision` |
 
 The full build needs roughly 27 GB of disk (16.8 GB primary, 2.2 GB overlay,
-6.6 GB of record files, 1.3 GB zip) and about two hours on a standard runner
-(the first run, 2026-11-09, took 2 h 02 min: 3 min download, 1 h 53 min for
-`all`, of which ~45 min is the schema validation). The runner had 145 GB of
-disk, so the *Free disk space* step is a safety margin rather than a
-requirement; the 16.8 GB file cannot be cached between runs (10 GB cache
-limit), so every run downloads it again. The pipeline completed within the
-runner's 7 GB of memory. The
-release step uses the workflow's `GITHUB_TOKEN` (`permissions: contents:
+6.6 GB of record files, 1.4 GB zip) and two to two and a half hours on a
+standard GitHub-hosted runner (the two runs of 2026-11-09 took 2 h 02 min and
+2 h 29 min: 3 min download, the rest `all`, of which ~45 min is the schema
+validation). The runner had 145 GB of disk, so the *Free disk space* step is
+a safety margin rather than a requirement; the 16.8 GB file cannot be cached
+between runs (10 GB cache limit), so every run downloads it again. Both runs
+completed without memory problems.
+
+To publish a new release, run the workflow from the Actions tab or with
+`gh workflow run build-release.yml`. Nothing rebuilds automatically: not a
+push to `main`, and not a merged upstream-inputs pull request.
+
+The release step uses the workflow's `GITHUB_TOKEN` (`permissions: contents:
 write`); the `release` command skips its account-permission probe when it
 detects GitHub Actions. Pull requests opened by the upstream check come from
 the workflow token, so they do not trigger the tests workflow themselves; the
@@ -338,7 +388,9 @@ tests run once the branch is pushed by a person or when the PR is merged.
 python -X utf8 -m pytest -q
 ```
 
-Fixtures under `tests/fixtures/` are real rows copied from both sources.
+Fixtures under `tests/fixtures/` are real rows copied from both sources. The
+tests need neither corpus nor CC-CEDICT, and the Yomitan schemas they
+validate against are committed under `data/schemas/`.
 
 ## License and attribution
 
@@ -346,5 +398,10 @@ The dictionary content is Baidu Baike user-contributed material, taken from the
 third-party mirrors `lars1234/baidu-baike-dataset` and `mohamedah/baidu_baike`
 on Hugging Face; each entry links back to its Baike article. This repository
 contains the converter code and small test fixtures; the built `dist/*.zip`
-files are distributed as GitHub release assets. CC-CEDICT is CC BY-SA 4.0
-(used here only to select headwords).
+files are distributed as GitHub release assets.
+
+[CC-CEDICT](https://cc-cedict.org/) is licensed CC BY-SA 4.0. It selects the
+headwords of the lexical dictionary, and with `--pinyin` its readings are
+copied into the reading field of every entry whose title it lists; the
+`attribution` field of `index.json` and the release notes say so. No
+CC-CEDICT definitions are included.

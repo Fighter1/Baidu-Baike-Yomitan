@@ -118,8 +118,12 @@ def update_urls(update_base_url: str, stem: str) -> tuple[str, str]:
     return f"{base}/{stem}.index.json", f"{base}/{stem}.zip"
 
 
+CEDICT_ATTRIBUTION = "Readings partly from CC-CEDICT (https://cc-cedict.org), CC BY-SA 4.0."
+
+
 def make_index(title: str, merged: bool, description_extra: str = "", revision: str | None = None,
-               update_base_url: str | None = None, stem: str | None = None) -> dict:
+               update_base_url: str | None = None, stem: str | None = None,
+               cedict_readings: bool = False) -> dict:
     idx = {
         "title": title,
         "format": 3,
@@ -131,7 +135,8 @@ def make_index(title: str, merged: bool, description_extra: str = "", revision: 
                         "Hugging Face mirrors (BIT-ENGD 2019 crawl" + (", Internet Archive snapshots 2020-2024" if merged else "") + "). "
                         "User-contributed encyclopedia content." + description_extra),
         "attribution": "Content © Baidu Baike contributors (https://baike.baidu.com). Mirror: lars1234/baidu-baike-dataset"
-                       + ("; overlay: mohamedah/baidu_baike" if merged else "") + ".",
+                       + ("; overlay: mohamedah/baidu_baike" if merged else "") + "."
+                       + (" " + CEDICT_ATTRIBUTION if cedict_readings else ""),
         "sourceLanguage": "zh",
         "targetLanguage": "zh",
     }
@@ -262,7 +267,8 @@ def build(records_path: str, out_zip: str, title: str | None = None,
                       f"{time.time()-t0:,.0f}s", file=sys.stderr, flush=True)
         banks.flush()
         zf.writestr("styles.css", STYLES_CSS)
-        index = make_index(title, merged, revision=revision, update_base_url=update_base_url, stem=stem)
+        index = make_index(title, merged, revision=revision, update_base_url=update_base_url, stem=stem,
+                           cedict_readings=bool(to_reading and to_reading.cedict))
         zf.writestr("index.json", dumps(index))
         stats["term_banks"] = banks.bank_no
     # Same bytes as the zip's index.json, written next to it for `release` to upload.

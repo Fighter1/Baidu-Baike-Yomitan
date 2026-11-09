@@ -37,6 +37,7 @@ def test_update_urls_and_revision_rules():
 def test_make_index_updatable_fields():
     plain = make_index("T", merged=False)
     assert "isUpdatable" not in plain and "indexUrl" not in plain
+    assert "CC-CEDICT" not in plain["attribution"]
     idx = make_index("T", merged=True, revision="2026.11.08", update_base_url=BASE, stem="baike-full")
     assert idx["isUpdatable"] is True
     assert idx["indexUrl"] == BASE + "/baike-full.index.json"
@@ -88,6 +89,10 @@ def test_release_notes_table(tmp_path):
         {"sources": {"563w": {"repo_id": "lars1234/baidu-baike-dataset", "revision": "246e64b6c441a7d0"}}}), "utf-8")
     notes = rel.release_notes(["dist/baike-full.zip"], [{"title": "T", "revision": "2026.11.08"}], stats_dir=str(tmp_path))
     assert "`lars1234/baidu-baike-dataset@246e64b6c441`" in notes
+    assert "CC-CEDICT" not in notes
+    notes = rel.release_notes(["dist/baike-full.zip"], [make_index("T", merged=True, cedict_readings=True)],
+                              stats_dir=str(tmp_path))
+    assert "CC-CEDICT" in notes and "CC BY-SA 4.0" in notes
 
 
 class _FakeGh:
