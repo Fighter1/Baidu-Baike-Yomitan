@@ -13,7 +13,8 @@ RECORDS_HF = os.path.join("data", "records.hf.jsonl")
 RECORDS_MERGED = os.path.join("data", "records.merged.jsonl")
 DIST_FULL = os.path.join("dist", "baike-full.zip")
 DIST_LEX = os.path.join("dist", "baike-lexical.zip")
-BASE_TITLE = "[ZH-ZH] 百度百科 (2019 crawl, pilot)"
+TITLE_FULL = "百度百科 (full)"
+TITLE_LEX = "百度百科 (lexical)"
 
 
 def _print_stats(name: str, stats: dict) -> None:
@@ -102,7 +103,7 @@ def cmd_build(a) -> int:
         cedict_words = load_simplified_headwords(a.cedict)
         print(f"CC-CEDICT simplified headwords: {len(cedict_words):,}")
     exclude = set(t for t in (a.exclude_tags or "").split(",") if t)
-    title = a.title or (BASE_TITLE + (" (lexical)" if cedict_words is not None else ""))
+    title = a.title or (TITLE_LEX if cedict_words is not None else TITLE_FULL)
     _build_one(a.records, a.out, title, a, cedict_words, exclude)
     if not a.no_validate:
         return cmd_validate(argparse.Namespace(zip=a.out, schemas_dir=a.schemas_dir, engine="auto"))
@@ -212,8 +213,8 @@ def cmd_all(a) -> int:
     words = load_simplified_headwords(cedict_path)
     print(f"CC-CEDICT simplified headwords: {len(words):,}")
     exclude = set(t for t in (a.exclude_tags or "").split(",") if t)
-    _build_one(records, DIST_FULL, BASE_TITLE, a)
-    lex = _build_one(records, DIST_LEX, BASE_TITLE + " (lexical)", a, words, exclude)
+    _build_one(records, DIST_FULL, TITLE_FULL, a)
+    lex = _build_one(records, DIST_LEX, TITLE_LEX, a, words, exclude)
     rc = 0
     for z in (DIST_FULL, DIST_LEX):
         if getattr(a, "no_validate", False):

@@ -114,7 +114,7 @@ def update_urls(update_base_url: str, stem: str) -> tuple[str, str]:
 def make_index(title: str, merged: bool, description_extra: str = "", revision: str | None = None,
                update_base_url: str | None = None, stem: str | None = None) -> dict:
     idx = {
-        "title": title + (" +IA overlay" if merged else ""),
+        "title": title,
         "format": 3,
         "revision": check_revision(revision or default_revision()),
         "sequenced": True,
@@ -189,7 +189,7 @@ def _sense_key(rec: dict) -> tuple:
     return (rec.get("lemma_id"), rec.get("sense_label") or "", (rec.get("summary") or "")[:40])
 
 
-def build(records_path: str, out_zip: str, title: str = "[ZH-ZH] 百度百科 (2019 crawl, pilot)",
+def build(records_path: str, out_zip: str, title: str = "百度百科 (full)",
           pinyin: bool = False, traditional: str | None = None, infobox: bool = False,
           cedict_words: set[str] | None = None, exclude_tags: set[str] | None = None,
           merged: bool | None = None, revision: str | None = None,

@@ -153,7 +153,7 @@ UI labels 播报/编辑/语音 and the overlay's `zhua曲子白渡白颗` traile
 whitespace (incl. fullwidth and no-break spaces) is normalised and single spaces
 between Chinese characters are dropped.
 
-Outputs (figures from the 2026-11-08 pilot build, `--pinyin --traditional s2t --infobox`):
+Outputs (figures from the 2026-11-09 release build, `--pinyin --traditional s2t --infobox`):
 
 - `data/records.jsonl` (4.72 M records), `data/records.hf.jsonl` (383 k), `data/records.merged.jsonl` (4.89 M) — one JSON record per sense
 - `data/extract_report.md` — drop counts by reason, quality flags, merge counts, heuristics notes
@@ -198,7 +198,8 @@ reference implementation.
 
 Yomitan → Settings → Dictionaries → *Import* → pick `dist/baike-full.zip`
 (and/or `dist/baike-lexical.zip`). Each zip is a separate dictionary with a
-distinct title; enable whichever you want in the dictionary list. Entries carry
+distinct title, `百度百科 (full)` and `百度百科 (lexical)`; enable whichever you
+want in the dictionary list. Entries carry
 the single tag `百科`. Headwords are simplified; with `--traditional` the same
 entries are also reachable from traditional-script text.
 

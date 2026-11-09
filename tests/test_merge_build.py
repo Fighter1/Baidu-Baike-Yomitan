@@ -134,7 +134,7 @@ def test_build_validate_and_smoke(tmp_path):
         names = set(zf.namelist())
         assert names == {"index.json", "tag_bank_1.json", "term_bank_1.json"}
         idx = json.loads(zf.read("index.json"))
-        assert idx["title"].endswith("+IA overlay") and idx["format"] == 3 and idx["sequenced"] is True
+        assert idx["title"] == "百度百科 (full)" and idx["format"] == 3 and idx["sequenced"] is True
         assert idx["sourceLanguage"] == "zh" and idx["targetLanguage"] == "zh"
         bank = json.loads(zf.read("term_bank_1.json"))
         by_title = {}
