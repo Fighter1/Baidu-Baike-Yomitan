@@ -36,7 +36,7 @@ jobs:
       PYTHONUTF8: "1"
       HF_HUB_ENABLE_HF_TRANSFER: "1"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Free disk space
         # GitHub documents ~14 GB free on standard runners; the pipeline needs
@@ -51,7 +51,7 @@ jobs:
           sudo apt-get clean > /dev/null 2>&1 || true
           df -h / | tail -1
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -81,7 +81,7 @@ jobs:
 
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: reports-${{ env.REVISION }}
           retention-days: 30
@@ -94,7 +94,7 @@ jobs:
 
       - name: Upload zips as an artifact (build-only run)
         if: ${{ !inputs.publish }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dictionaries-${{ env.REVISION }}
           retention-days: 7
