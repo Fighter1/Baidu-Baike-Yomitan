@@ -82,7 +82,12 @@ def test_release_notes_table(tmp_path):
     notes = rel.release_notes(["dist/baike-full.zip"], [{"title": "T", "revision": "2026.11.08"}],
                               stats_dir=str(tmp_path), today=__import__("datetime").date(2026, 11, 8))
     assert "| `baike-full.zip` | T | 2026.11.08 | 8,817,011 | 3,928,236 | 882 | 1,305 MB |" in notes
-    assert "merged 4,888,775" in notes and "personal use only" in notes
+    assert "merged 4,888,775" in notes and "personal" not in notes
+    assert "source-inputs" not in notes
+    (tmp_path.parent / "source-inputs.json").write_text(json.dumps(
+        {"sources": {"563w": {"repo_id": "lars1234/baidu-baike-dataset", "revision": "246e64b6c441a7d0"}}}), "utf-8")
+    notes = rel.release_notes(["dist/baike-full.zip"], [{"title": "T", "revision": "2026.11.08"}], stats_dir=str(tmp_path))
+    assert "`lars1234/baidu-baike-dataset@246e64b6c441`" in notes
 
 
 class _FakeGh:
@@ -142,18 +147,19 @@ def test_release_uploads_to_existing_tag_with_clobber(built_zip, monkeypatch):
     assert "--clobber" in upload
 
 
-def test_release_refuses_public_repo_and_read_access(built_zip, monkeypatch):
-    monkeypatch.setattr(rel, "_gh", _FakeGh(private=False))
-    with pytest.raises(rel.ReleaseError, match="PUBLIC"):
-        rel.release([built_zip], repo=REPO, stats_dir="nowhere")
+def test_release_refuses_read_access_and_warns_on_private(built_zip, monkeypatch, capsys):
     monkeypatch.setattr(rel, "_gh", _FakeGh(perm="READ"))
     with pytest.raises(rel.ReleaseError, match="READ access"):
         rel.release([built_zip], repo=REPO, stats_dir="nowhere")
-    # --allow-public lifts only the visibility guard
+    # a public repository needs no acknowledgement; a private one only gets a warning
     gh = _FakeGh(private=False)
     monkeypatch.setattr(rel, "_gh", gh)
-    assert rel.release([built_zip], repo=REPO, allow_public=True, stats_dir="nowhere") == 0
+    assert rel.release([built_zip], repo=REPO, stats_dir="nowhere") == 0
     assert any(c[:2] == ["release", "create"] for c in gh.calls)
+    assert "WARNING" not in capsys.readouterr().out
+    monkeypatch.setattr(rel, "_gh", _FakeGh(private=True))
+    assert rel.release([built_zip], repo=REPO, stats_dir="nowhere") == 0
+    assert "private" in capsys.readouterr().out
 
 
 def test_release_dry_run_reports_problems_without_uploading(built_zip, monkeypatch, capsys):
@@ -163,7 +169,7 @@ def test_release_dry_run_reports_problems_without_uploading(built_zip, monkeypat
     rc = rel.release([built_zip], repo="other/repo", dry_run=True, stats_dir="nowhere")
     assert rc == 0
     out = capsys.readouterr().out
-    assert "dry run" in out and "WARNING" in out and "READ access" in out and "PUBLIC" in out
+    assert "dry run" in out and "WARNING" in out and "READ access" in out
     assert "--update-url github" in out
     assert not any(c[:2] in (["release", "create"], ["release", "upload"]) for c in gh.calls)
 

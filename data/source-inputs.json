@@ -1,0 +1,82 @@
+{
+ "sources": {
+  "563w": {
+   "repo_id": "lars1234/baidu-baike-dataset",
+   "repo_type": "dataset",
+   "ref": "main",
+   "local_dir": "data/raw/563w",
+   "patterns": [
+    ".json"
+   ],
+   "revision": "246e64b6c441a7d0ea523c2b35c9075540f50513",
+   "last_modified": "2025-05-06T11:50:13+00:00",
+   "files": [
+    {
+     "path": "563w_baidubaike.json",
+     "size": 16833953491,
+     "sha256": "8e9fdc66f8d75a8627b1275a4d3afab4a8a3f09c89b0ed000725d19997404df1"
+    }
+   ]
+  },
+  "hf": {
+   "repo_id": "mohamedah/baidu_baike",
+   "repo_type": "dataset",
+   "ref": "refs/convert/parquet",
+   "local_dir": "data/raw/overlay",
+   "patterns": [
+    ".parquet"
+   ],
+   "revision": "e8eef91f0443c8252ceee00c0b1ca00990b9a5fd",
+   "last_modified": "2025-06-30T22:51:47+00:00",
+   "files": [
+    {
+     "path": "default/train/0000.parquet",
+     "size": 257593263,
+     "sha256": "19599ad199d2d5bd6822b9994c44079e4aab7e4a5ab102593c31a30f465d4328"
+    },
+    {
+     "path": "default/train/0001.parquet",
+     "size": 268512067,
+     "sha256": "fd72d1c54d35d0a1568573767235d05d4029ed8d5b390acd4ce002bcce4ca924"
+    },
+    {
+     "path": "default/train/0002.parquet",
+     "size": 268387766,
+     "sha256": "447c56683984b4ba1a5ce79144fda67927ead2104adbb25d05654c37110c6d32"
+    },
+    {
+     "path": "default/train/0003.parquet",
+     "size": 278397185,
+     "sha256": "631c20b42752c35872fc02bc1bf8e4fbfdf49534ed77e93bc2b9384ab8f0eab6"
+    },
+    {
+     "path": "default/train/0004.parquet",
+     "size": 263550141,
+     "sha256": "21829feb74b5bc2ad8903518b3d8dc4903839228306ec1c39b507cc2c3b1d40f"
+    },
+    {
+     "path": "default/train/0005.parquet",
+     "size": 276644583,
+     "sha256": "e225bee80499556e51862943c531e578bfaf84f74b6adafa2a1809b447e0f074"
+    },
+    {
+     "path": "default/train/0006.parquet",
+     "size": 279131883,
+     "sha256": "50f70ca5fa073070d69a120bff26842c22c3f184bab15554fe8444419e90790d"
+    },
+    {
+     "path": "default/train/0007.parquet",
+     "size": 260782514,
+     "sha256": "55e80704a93c122e0624c78dcbafe16233d642f602680632b2f0a9e804819faf"
+    },
+    {
+     "path": "default/train/0008.parquet",
+     "size": 27744934,
+     "sha256": "642ec3073ce4b5a1e1b9bef3e741a154600cc4fb1d14e3fe6074ad156abad8be"
+    }
+   ]
+  }
+ },
+ "generated": "2026-11-08",
+ "note": "Pinned Hugging Face inputs. sha256 values are the LFS object ids (= file SHA-256). Regenerate with `python -m baike2yomitan inputs pin`."
+}

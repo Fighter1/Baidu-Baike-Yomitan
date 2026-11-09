@@ -1,7 +1,7 @@
 # baike2yomitan
 
 Build importable [Yomitan](https://github.com/yomidevs/yomitan) dictionaries
-(term bank format 3) from offline copies of Baidu Baike. Personal-use pilot.
+(term bank format 3) from offline copies of Baidu Baike.
 
 The pipeline is source-agnostic: a thin per-source `extract` step writes a
 common JSONL record format, and `merge`, `build` and `validate` know nothing
@@ -29,16 +29,37 @@ python -m venv .venv
 Python 3.11+. On Windows run Python with `-X utf8` (or set `PYTHONUTF8=1`) so
 Chinese text prints correctly.
 
-### Downloading the corpora
+### Downloading the corpora (pinned inputs)
+
+`data/source-inputs.json` pins both datasets to a Hugging Face **commit** and
+records every input file's size and SHA-256 (Hugging Face keeps large files in
+LFS, whose object id is the file's SHA-256, so the manifest is filled from the
+API without downloading). The release tag pins the code; this manifest pins the
+data the same way. The 16.8 GB primary cannot be attached to a GitHub release
+(2 GiB asset limit), so the pin is a hash, not a copy.
+
+```bash
+python -X utf8 -m baike2yomitan inputs download     # fetch exactly the pinned commits into data/raw/ (16.8 GB + 2.2 GB)
+```
+
+```bash
+python -X utf8 -m baike2yomitan inputs verify       # size + SHA-256 of every local input (~2 min for the primary); --no-hash for size only
+```
+
+```bash
+python -X utf8 -m baike2yomitan inputs pin          # re-resolve main / refs/convert/parquet to their current commits and rewrite the manifest
+```
+
+`extract` (and therefore `all`) verifies its source against the manifest before
+streaming it and stops on a mismatch; `--skip-verify` bypasses the check,
+`--no-hash` checks sizes only, and a custom `--input` path is never checked.
+Run `inputs pin` deliberately when you *want* to move to newer upstream files;
+the diff of the manifest then shows what changed. Equivalent manual download:
 
 ```python
 from huggingface_hub import hf_hub_download
-hf_hub_download("lars1234/baidu-baike-dataset", "563w_baidubaike.json",
-                repo_type="dataset", local_dir="data/raw/563w")           # 16.8 GB
-for i in range(9):                                                        # overlay, ~2.2 GB
-    hf_hub_download("mohamedah/baidu_baike", f"default/train/{i:04d}.parquet",
-                    repo_type="dataset", revision="refs/convert/parquet",
-                    local_dir="data/raw/overlay")
+hf_hub_download("lars1234/baidu-baike-dataset", "563w_baidubaike.json", repo_type="dataset",
+                revision="<revision from the manifest>", local_dir="data/raw/563w")
 ```
 
 Do not use `datasets.load_dataset` on the primary file: it would build a second
@@ -68,6 +89,8 @@ stops after N input rows for fast iteration.
 | flag | step | effect |
 |---|---|---|
 | `--limit N` | extract, all | stop after N input rows (fast iteration) |
+| `--skip-verify`, `--no-hash` | extract, all | skip the pinned-input check, or check sizes only |
+| `inputs pin\|verify\|download [--source 563w\|hf]` | inputs | maintain `data/source-inputs.json` (see *Downloading the corpora*) |
 | `--max-summary-chars N` | extract, all | trim summaries to N chars at the last `。！？；` inside the window (default 300); a hard cut adds `…` |
 | `--no-infobox` | extract, all | do not parse `基本信息`/`基本资料` sections into `[key, value]` pairs |
 | `--merge-key title\|lemma_id` | merge | how overlay records match primary ones; `title` is the default because the two sources' ids differ (see below) |
@@ -79,7 +102,7 @@ stops after N input rows for fast iteration.
 | `--title` | build | override the dictionary title stored in `index.json` |
 | `--revision R` | build, all | `index.json` revision; dot-separated integers only (default: today as `2026.11.08`) |
 | `--update-url BASE\|github` | build, all | make the zip self-updating: `index.json` gets `isUpdatable` + `indexUrl`/`downloadUrl` under `BASE`; `github` derives `https://github.com/<owner>/<repo>/releases/latest/download` from the `origin` remote |
-| `--repo`, `--tag`, `--title`, `--notes-file`, `--draft`, `--allow-public`, `--dry-run` | release | see *Self-updating dictionaries* below |
+| `--repo`, `--tag`, `--title`, `--notes-file`, `--draft`, `--dry-run` | release | see *Self-updating dictionaries* below |
 | `--no-validate` | build | skip the schema check after building |
 | `--engine auto\|fast\|jsonschema` | validate | fastjsonschema when installed (default), or the reference implementation |
 | `--schemas-dir`, `--seed` | build, validate, smoke, sample | where the Yomitan schemas are cached; seed for the random smoke/sample picks |
@@ -230,10 +253,9 @@ with the same content. `release` then, through the `gh` CLI:
 1. checks the zips exist and are under GitHub's 2 GiB asset limit;
 2. resolves the repository (`--repo owner/name`, else the `origin` remote) and
    requires that the logged-in `gh` account has write access to it;
-3. **refuses a public repository unless `--allow-public` is given** — a
-   release there publishes Baidu Baike content, which the usage note below
-   says not to do. A private repository is safe but Yomitan cannot download
-   from it (no auth header), so auto-update only works from a public one;
+3. notes whether the repository is private — Yomitan cannot download assets
+   from a private repository (it sends no auth header), so auto-update only
+   works from a public one;
 4. reads each zip's `index.json`, requires the `isUpdatable`/URL fields to
    match that repository (otherwise it tells you the exact `build` command to
    re-run), and regenerates the sidecar from the zip;
@@ -256,12 +278,11 @@ python -X utf8 -m pytest -q
 
 Fixtures under `tests/fixtures/` are real rows copied from both sources.
 
-## License and usage note
+## License and attribution
 
-The dictionary content is Baidu Baike user-contributed material mirrored by
-third parties for research. This repository only contains code and small test
-fixtures. The built `dist/*.zip` files are for personal use only — **do not
-publish or redistribute them.** The `release` command exists for a private
-repository or a deliberate, acknowledged (`--allow-public`) exception; it does
-not change this note. CC-CEDICT is CC BY-SA 4.0 (used here only to select
-headwords).
+The dictionary content is Baidu Baike user-contributed material, taken from the
+third-party mirrors `lars1234/baidu-baike-dataset` and `mohamedah/baidu_baike`
+on Hugging Face; each entry links back to its Baike article. This repository
+contains the converter code and small test fixtures; the built `dist/*.zip`
+files are distributed as GitHub release assets. CC-CEDICT is CC BY-SA 4.0
+(used here only to select headwords).

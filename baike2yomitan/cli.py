@@ -23,9 +23,28 @@ def _print_stats(name: str, stats: dict) -> None:
         print(f"  {k:40s} {v:>12,}" if isinstance(v, int) else f"  {k:40s} {v}")
 
 
+def _verify_input(a) -> None:
+    """Check the default input against data/source-inputs.json before extracting."""
+    from .inputs import MANIFEST_PATH, InputError, verify_or_raise
+
+    if getattr(a, "skip_verify", False):
+        return
+    if a.input:
+        print(f"  [inputs] custom --input given; not checked against {MANIFEST_PATH}", file=sys.stderr)
+        return
+    if not os.path.exists(MANIFEST_PATH):
+        print(f"  [inputs] {MANIFEST_PATH} missing; inputs not verified (run `inputs pin`)", file=sys.stderr)
+        return
+    try:
+        verify_or_raise(a.source, MANIFEST_PATH, hash=not getattr(a, "no_hash", False))
+    except InputError as e:
+        raise SystemExit(f"extract: {e}") from e
+
+
 def cmd_extract(a) -> int:
     from .report import save_stats, write_report
 
+    _verify_input(a)
     if a.source == "563w":
         from .extract_563w import extract
 
@@ -132,12 +151,40 @@ def cmd_sample(a) -> int:
     return 0
 
 
+def cmd_inputs(a) -> int:
+    from . import inputs
+
+    path = a.manifest or inputs.MANIFEST_PATH
+    names = [a.source] if a.source else None
+    try:
+        if a.action == "pin":
+            inputs.pin(path, names)
+            print("wrote", path)
+            return 0
+        manifest = inputs.load_manifest(path)
+        rc = 0
+        for name in names or manifest["sources"]:
+            if a.action == "download":
+                inputs.download_source(manifest, name)
+            problems = inputs.verify_source(manifest, name, hash=not a.no_hash,
+                                            log=lambda m: print(m, file=sys.stderr, flush=True))
+            for p in problems:
+                print(f"  FAIL {p}")
+            print(f"{name}: {'OK' if not problems else f'{len(problems)} problem(s)'}"
+                  f" ({manifest['sources'][name]['repo_id']}@{manifest['sources'][name]['revision'][:12]})")
+            rc |= 1 if problems else 0
+        return rc
+    except inputs.InputError as e:
+        print(f"inputs: {e}", file=sys.stderr)
+        return 2
+
+
 def cmd_release(a) -> int:
     from .release import ReleaseError, release
 
     try:
         return release(a.zips, repo=a.repo, tag=a.tag, title=a.title, notes_file=a.notes_file,
-                       draft=a.draft, allow_public=a.allow_public, dry_run=a.dry_run)
+                       draft=a.draft, dry_run=a.dry_run)
     except ReleaseError as e:
         print(f"release: {e}", file=sys.stderr)
         return 2
@@ -187,6 +234,10 @@ def main(argv=None) -> int:
 
     def add_common_extract(sp):
         sp.add_argument("--limit", type=int, default=None, help="stop after N input rows")
+        sp.add_argument("--skip-verify", action="store_true",
+                        help="do not check the input files against data/source-inputs.json")
+        sp.add_argument("--no-hash", action="store_true",
+                        help="verify pinned inputs by size only (skip the SHA-256, ~2 min for the primary)")
         sp.add_argument("--max-summary-chars", type=int, default=300)
         sp.add_argument("--no-infobox", action="store_true", help="do not extract 基本信息 key/value pairs")
 
@@ -248,6 +299,13 @@ def main(argv=None) -> int:
     sp.add_argument("--seed", type=int, default=None)
     sp.set_defaults(fn=cmd_sample)
 
+    sp = sub.add_parser("inputs", help="pin / verify / download the Hugging Face source files (data/source-inputs.json)")
+    sp.add_argument("action", choices=["pin", "verify", "download"])
+    sp.add_argument("--source", choices=["563w", "hf"], default=None, help="one source (default: all)")
+    sp.add_argument("--manifest", default=None)
+    sp.add_argument("--no-hash", action="store_true", help="verify: size only, skip SHA-256")
+    sp.set_defaults(fn=cmd_inputs)
+
     sp = sub.add_parser("release", help="upload dist zips (+ sidecar index.json) as a GitHub release via gh")
     sp.add_argument("zips", nargs="*", default=[DIST_FULL, DIST_LEX],
                     help=f"zips to upload (default: {DIST_FULL} {DIST_LEX})")
@@ -256,8 +314,6 @@ def main(argv=None) -> int:
     sp.add_argument("--title", default=None, help="release title (default: the tag)")
     sp.add_argument("--notes-file", default=None, help="markdown notes (default: generated from data/stats)")
     sp.add_argument("--draft", action="store_true", help="create the release as a draft")
-    sp.add_argument("--allow-public", action="store_true",
-                    help="upload even if the repository is public (the zips are personal-use only)")
     sp.add_argument("--dry-run", action="store_true", help="check everything and print the gh commands")
     sp.set_defaults(fn=cmd_release)
 

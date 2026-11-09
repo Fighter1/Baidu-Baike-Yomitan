@@ -138,10 +138,17 @@ def release_notes(zips: list[str], indexes: list[dict], stats_dir: str = os.path
     if p or h or m:
         lines += ["", "Records: primary {:,} · overlay {:,} · merged {:,} (see `data/extract_report.md`).".format(
             p.get("records_written", 0), h.get("records_written", 0), m.get("records_written", 0))]
+    manifest_path = os.path.join(os.path.dirname(stats_dir.rstrip("/\\")) or ".", "source-inputs.json")
+    if os.path.exists(manifest_path):
+        with open(manifest_path, encoding="utf-8") as f:
+            srcs = json.load(f).get("sources", {})
+        pins = ", ".join(f"`{s['repo_id']}@{s['revision'][:12]}`" for s in srcs.values() if s.get("revision"))
+        if pins:
+            lines += ["", f"Inputs pinned in `data/source-inputs.json`: {pins}."]
     lines += ["", "**Import:** Yomitan → Settings → Dictionaries → Import → pick the zip. "
               "**Update:** the zips are self-updating; Yomitan → Settings → Dictionaries → *Check for updates*.",
               "", "Content is Baidu Baike user-contributed material mirrored by third parties "
-              "(lars1234/baidu-baike-dataset, mohamedah/baidu_baike); personal use only."]
+              "(lars1234/baidu-baike-dataset, mohamedah/baidu_baike); each entry links to its Baike article."]
     return "\n".join(lines) + "\n"
 
 
@@ -193,7 +200,7 @@ def _fmt(cmd: list[str]) -> str:
 # ------------------------------------------------------------------- driver
 
 def release(zips: list[str], *, repo: str | None = None, tag: str | None = None, title: str | None = None,
-            notes_file: str | None = None, draft: bool = False, allow_public: bool = False,
+            notes_file: str | None = None, draft: bool = False,
             dry_run: bool = False, stats_dir: str = os.path.join("data", "stats"),
             out=None) -> int:
     """Upload zips + sidecar index files as one GitHub release. Returns 0 on
@@ -232,11 +239,10 @@ def release(zips: list[str], *, repo: str | None = None, tag: str | None = None,
         if perm not in WRITE_PERMISSIONS:
             problem(f"the gh account has {perm} access to {repo}; creating a release needs write access "
                     "(`gh auth login` / `gh auth switch` to the repository owner, or pass --repo)")
-        if not info.get("isPrivate") and not allow_public:
-            problem(f"{repo} is PUBLIC: uploading the zips there publishes Baidu Baike content, which the "
-                    "README says not to do. Make the repository private, or pass --allow-public if you accept that. "
-                    "Note: Yomitan cannot download assets of a private repository (no auth header), so auto-update "
-                    "only works from a public one; a private release still gives you manual downloads.")
+        if info.get("isPrivate"):
+            warnings.append(f"{repo} is private: Yomitan cannot download assets from a private repository "
+                            "(it sends no auth header), so auto-update will not work until it is public; "
+                            "manual downloads still do.")
 
     if info and not repo_has_commits(repo):
         problem(f"{repo} has no commits. A release is a git tag, so commit and push the source first; "

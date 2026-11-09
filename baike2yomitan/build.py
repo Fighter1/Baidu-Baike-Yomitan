@@ -117,11 +117,11 @@ def make_index(title: str, merged: bool, description_extra: str = "", revision: 
         "format": 3,
         "revision": check_revision(revision or default_revision()),
         "sequenced": True,
-        "author": "baike2yomitan (personal build)",
+        "author": "baike2yomitan",
         "url": "https://huggingface.co/datasets/lars1234/baidu-baike-dataset",
         "description": ("Baidu Baike summaries as a Chinese-Chinese Yomitan dictionary, built from offline "
                         "Hugging Face mirrors (BIT-ENGD 2019 crawl" + (", Internet Archive snapshots 2020-2024" if merged else "") + "). "
-                        "User-contributed encyclopedia content; personal use only." + description_extra),
+                        "User-contributed encyclopedia content." + description_extra),
         "attribution": "Content © Baidu Baike contributors (https://baike.baidu.com). Mirror: lars1234/baidu-baike-dataset"
                        + ("; overlay: mohamedah/baidu_baike" if merged else "") + ".",
         "sourceLanguage": "zh",

@@ -1,4 +1,10 @@
-  [build] pass 1: ranking senses
+﻿.venv\Scripts\python :   [build] pass 1: ranking senses
+At line:1 char:325
++ ... UTF8 = "1"; .venv\Scripts\python -m baike2yomitan build --records dat ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (  [build] pass 1: ranking senses:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
   [build] pass 2: writing term banks
   [validate] term_bank_1.json: ok (10000)
   [validate] term_bank_2.json: ok (10000)
@@ -24,10 +30,10 @@ CC-CEDICT simplified headwords: 121,612
   entries                                       159,702
   entries_traditional                            60,785
   records_seen                                4,888,775
-  seconds                                            48
+  seconds                                            44
   skip:excluded_tag                               3,832
   skip:not_in_cedict                          4,786,026
   term_banks                                         16
   titles_with_multiple_senses                    32,691
-  zip_bytes                                  25,112,404
+  zip_bytes                                  25,112,386
 VALIDATION OK: dist/baike-lexical.zip

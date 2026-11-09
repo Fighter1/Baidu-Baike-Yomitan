@@ -1,0 +1,10 @@
+﻿repository: Fighter1/Baidu-Baike-Yomitan
+  dist\baike-full.zip: revision 2026.11.08  title '[ZH-ZH] 百度百科 (2019 crawl, pilot) +IA overlay'
+  dist\baike-lexical.zip: revision 2026.11.08  title '[ZH-ZH] 百度百科 (2019 crawl, pilot) (lexical) +IA overlay'
+$ gh release upload v2026.11.08 dist\baike-full.zip dist\baike-full.index.json dist\baike-lexical.zip dist\baike-lexical.index.json --repo Fighter1/Baidu-Baike-Yomitan --clobber
+$ gh release edit v2026.11.08 --repo Fighter1/Baidu-Baike-Yomitan --latest --notes-file dist\v2026.11.08.notes.md
+https://github.com/Fighter1/Baidu-Baike-Yomitan/releases/tag/v2026.11.08
+
+released v2026.11.08 to https://github.com/Fighter1/Baidu-Baike-Yomitan/releases/tag/v2026.11.08
+check:  curl -L https://github.com/Fighter1/Baidu-Baike-Yomitan/releases/latest/download/baike-full.index.json
+then in Yomitan: Settings → Dictionaries → Check for updates
