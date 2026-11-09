@@ -95,6 +95,8 @@ def validate_zip(zip_path: str, schema_dir: str = DEFAULT_SCHEMA_DIR, max_errors
                 kind = "term"
             elif re.fullmatch(r"tag_bank_\d+\.json", name):
                 kind = "tag"
+            elif name == "styles.css":  # dictionary-scoped CSS, no schema
+                continue
             else:
                 errors.append(f"unexpected file in zip: {name}")
                 continue

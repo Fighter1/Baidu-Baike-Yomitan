@@ -218,6 +218,13 @@ the merge mode requires.
 With `--pinyin` the reading (`yí mín`) is attached to both spellings; the
 traditional chip reuses the pinyin computed from the simplified title.
 
+Independently of the grouping mode, every entry built with `--traditional`
+opens with both spellings in small boxes, traditional (red) then simplified
+(blue), the way 汉语大词典 and other dual-script Yomitan dictionaries do. The
+boxes are styled by a `styles.css` inside the zip, which Yomitan applies only
+to this dictionary's entries; a title that OpenCC leaves unchanged gets a
+single simplified box.
+
 ## Self-updating dictionaries (GitHub Releases)
 
 Yomitan can update a dictionary by itself when its `index.json` carries

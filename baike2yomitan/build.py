@@ -24,6 +24,18 @@ _MUTED = {"fontSize": "80%", "color": "#888888"}
 TITLE_FULL = "百度百科 (full)"
 TITLE_LEX = "百度百科 (lexical)"
 
+# Shipped in the zip as styles.css; Yomitan scopes it to this dictionary's
+# content. `data: {"baike": X}` in structured content becomes the HTML
+# attribute data-sc-baike="X".
+STYLES_CSS = """\
+[data-sc-baike="terms"] { display: inline-flex; margin-bottom: 0.35em; }
+[data-sc-baike="traditional-term"], [data-sc-baike="simplified-term"] {
+  display: inline-block; padding: 4px; margin-right: 6px; line-height: 1; font-size: 1.1em;
+  border: 1px solid #454545; border-radius: 4px; background: #111; }
+[data-sc-baike="traditional-term"] { color: #e42566; }
+[data-sc-baike="simplified-term"] { color: #257de4; }
+"""
+
 
 def _cjk(text: str) -> bool:
     return any("一" <= ch <= "鿿" for ch in text)
@@ -52,8 +64,17 @@ class Traditional:
         return self._cc.convert(text)
 
 
-def structured_content(rec: dict, want_infobox: bool) -> dict:
+def structured_content(rec: dict, want_infobox: bool, traditional: str | None = None) -> dict:
+    """`traditional` is the OpenCC form of the title when the build emits
+    traditional headwords (None otherwise); the entry then opens with the
+    traditional and simplified spellings side by side, like 汉语大词典."""
     parts: list = []
+    if traditional is not None:
+        terms: list = []
+        if traditional != rec["title"]:
+            terms.append({"tag": "span", "data": {"baike": "traditional-term"}, "content": traditional})
+        terms.append({"tag": "span", "data": {"baike": "simplified-term"}, "content": rec["title"]})
+        parts.append({"tag": "div", "data": {"baike": "terms"}, "content": terms})
     label = rec.get("sense_label") or ""
     if label and label != rec.get("title"):  # a subtitle equal to the title says nothing
         parts.append({"tag": "div", "data": {"baike": "sense-label"}, "style": dict(_MUTED),
@@ -236,21 +257,21 @@ def build(records_path: str, out_zip: str, title: str | None = None,
             rank = ranks.get(t, {}).get(_sense_key(rec), 0)
             score = -rank
             seq += 1
-            content = structured_content(rec, infobox)
+            tt = to_trad(t) if to_trad else None
+            content = structured_content(rec, infobox, tt)
             reading = to_pinyin(t) if to_pinyin else ""
             banks.add([t, reading, DICT_TAG, "", score, [content], seq, ""])
             stats["entries"] += 1
-            if to_trad:
-                tt = to_trad(t)
-                if tt != t:
-                    banks.add([tt, reading, DICT_TAG, "", score, [content], seq, ""])
-                    stats["entries"] += 1
-                    stats["entries_traditional"] += 1
+            if tt is not None and tt != t:
+                banks.add([tt, reading, DICT_TAG, "", score, [content], seq, ""])
+                stats["entries"] += 1
+                stats["entries_traditional"] += 1
             if stats["records_seen"] % 500_000 == 0:
                 print(f"  [build] {stats['records_seen']:,} records, {stats['entries']:,} entries, "
                       f"{time.time()-t0:,.0f}s", file=sys.stderr, flush=True)
         banks.flush()
         zf.writestr("tag_bank_1.json", dumps(TAG_BANK))
+        zf.writestr("styles.css", STYLES_CSS)
         index = make_index(title, merged, revision=revision, update_base_url=update_base_url, stem=stem)
         zf.writestr("index.json", dumps(index))
         stats["term_banks"] = banks.bank_no
