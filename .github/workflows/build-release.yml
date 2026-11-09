@@ -2,8 +2,8 @@ name: Build and release
 
 # Manual: download the pinned corpora (16.8 GB + 2.2 GB), run the whole
 # pipeline and publish both zips as the latest GitHub release so Yomitan's
-# "Check for updates" picks them up. Needs ~27 GB of disk and about 90 minutes
-# on a standard runner (the schema validation of the full zip is ~45 of those).
+# "Check for updates" picks them up. Needs ~27 GB of disk and about two hours
+# on a standard runner (first run: 2 h 02 min, ~45 min of it schema validation).
 
 on:
   workflow_dispatch:
@@ -39,8 +39,9 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Free disk space
-        # Standard runners have ~14 GB documented / ~25 GB real free space; the
-        # pipeline needs ~27 GB. Removing preinstalled toolchains frees 20+ GB.
+        # GitHub documents ~14 GB free on standard runners; the pipeline needs
+        # ~27 GB. Removing preinstalled toolchains frees 20+ GB. (The first run
+        # actually saw 88 GB free before this step, so it is a safety margin.)
         run: |
           df -h / | tail -1
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \

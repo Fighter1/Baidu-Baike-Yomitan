@@ -283,10 +283,13 @@ Three workflows under `.github/workflows/`:
 | `build-release.yml` | manual only (*Actions → Build and release → Run workflow*) | frees runner disk, downloads the pinned corpora, runs `all` with `--update-url github` and revision `UTC-date.run-number`, uploads the reports as an artifact and publishes the release as *latest*. Inputs: `publish` (off keeps the zips as a 7-day artifact instead), `skip_validation`, `revision` |
 
 The full build needs roughly 27 GB of disk (16.8 GB primary, 2.2 GB overlay,
-6.6 GB of record files, 1.3 GB zip) and about 90 minutes, 45 of them the schema
-validation. Standard runners fit that only after the *Free disk space* step; the
-16.8 GB file cannot be cached between runs (10 GB cache limit), so every run
-downloads it again. Memory use has not been measured on a 7 GB runner. The
+6.6 GB of record files, 1.3 GB zip) and about two hours on a standard runner
+(the first run, 2026-11-09, took 2 h 02 min: 3 min download, 1 h 53 min for
+`all`, of which ~45 min is the schema validation). The runner had 145 GB of
+disk, so the *Free disk space* step is a safety margin rather than a
+requirement; the 16.8 GB file cannot be cached between runs (10 GB cache
+limit), so every run downloads it again. The pipeline completed within the
+runner's 7 GB of memory. The
 release step uses the workflow's `GITHUB_TOKEN` (`permissions: contents:
 write`); the `release` command skips its account-permission probe when it
 detects GitHub Actions. Pull requests opened by the upstream check come from
