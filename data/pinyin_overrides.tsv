@@ -1,0 +1,4 @@
+# Hand-checked readings that win over every other source.
+# One per line: title<TAB>reading (lower-case, tone marks, syllables separated by spaces).
+# Add a word here when CC-CEDICT does not list it and its article states no pinyin.
+不着四六	bù zháo sì liù

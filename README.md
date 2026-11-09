@@ -94,7 +94,8 @@ stops after N input rows for fast iteration.
 | `--max-summary-chars N` | extract, all | trim summaries to N chars at the last `。！？；` inside the window (default 300); a hard cut adds `…` |
 | `--no-infobox` | extract, all | do not parse `基本信息`/`基本资料` sections into `[key, value]` pairs |
 | `--merge-key title\|lemma_id` | merge | how overlay records match primary ones; `title` is the default because the two sources' ids differ (see below) |
-| `--pinyin` | build, all | fill Yomitan's reading field with pypinyin (`hóng sè shí pǐn`); off by default, the reading is then empty |
+| `--pinyin` | build, all | fill Yomitan's reading field (`hóng sè shí pǐn`) from CC-CEDICT, the article's own pinyin, then pypinyin (see *Readings*); off by default, the reading is then empty |
+| `--readings-cedict PATH\|none` | build, all | CC-CEDICT export to take readings from; default is the `--cedict` file, else `data/cedict/…` when present |
 | `--traditional s2t\|s2twp\|s2hk` | build, all | also emit a traditional-script headword for every entry whose OpenCC conversion differs from the simplified title; same content and sequence number |
 | `--infobox` | build, all | render the extracted infobox pairs (first six) as a two-column table under the summary |
 | `--cedict PATH` | build | keep only records whose title is a simplified CC-CEDICT headword (the lexical build); `all` downloads the MDBG export when missing |
@@ -225,6 +226,32 @@ opens with both spellings in small boxes, traditional (red) then simplified
 boxes are styled by a `styles.css` inside the zip, which Yomitan applies only
 to this dictionary's entries; a title that OpenCC leaves unchanged gets a
 single simplified box.
+
+### Readings
+
+Neither corpus has a pinyin field, so `--pinyin` assembles the reading per
+record from the best source available (`baike2yomitan/readings.py`):
+
+1. `data/pinyin_overrides.tsv` — hand-checked `title<TAB>reading` lines;
+2. **CC-CEDICT**, when the title is a CC-CEDICT headword. With several
+   readings, the one the article states wins, else the one closest to the
+   pypinyin guess; proper-noun readings (`单 [Shan4]`) come last;
+3. **the article's own pinyin** — a `拼音`/`读音` infobox row or a run of
+   Latin letters in the summary (`拼音是zì kuài yǐ xià`), accepted only
+   when it splits into exactly one syllable per character and every
+   syllable is a reading that character really has;
+4. the same, borrowed from another sense of the same title;
+5. **pypinyin**, a per-character guess helped by a phrase list.
+
+On the merged records, about 102 k records are CC-CEDICT headwords and
+another 102 k state a fitting pinyin; the two sources agree with each other
+on 96.5 % of the titles that have both. The pypinyin guess they replace
+differed from them about 6 % of the time (a wrong syllable in roughly 3 %,
+for example `不粘锅` read `nián` instead of `zhān`). The remaining titles,
+mostly names of people, places and works, still get the guess, so a
+polyphonic character in such a title can be wrong; add the word to the
+overrides file to pin it. The build statistics count each source
+(`reading:cedict`, `reading:article`, `reading:pypinyin`, …).
 
 ## Self-updating dictionaries (GitHub Releases)
 

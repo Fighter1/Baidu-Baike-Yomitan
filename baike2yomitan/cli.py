@@ -76,7 +76,26 @@ def cmd_merge(a) -> int:
     return 0
 
 
-def _build_one(records, out, a, cedict_words=None, exclude_tags=None):
+def _readings_cedict(a, fallback=None):
+    """CC-CEDICT export to take readings from: --readings-cedict, else the
+    given path, else the default download location when it exists."""
+    from .cedict import DEFAULT_PATH
+
+    if not a.pinyin:
+        return None
+    explicit = getattr(a, "readings_cedict", None)
+    if explicit == "none":
+        return None
+    path = explicit or fallback or (DEFAULT_PATH if os.path.exists(DEFAULT_PATH) else None)
+    if path is None:
+        print("readings: CC-CEDICT not found, using article pinyin and pypinyin only "
+              "(pass --readings-cedict PATH, or run `all`, which downloads it)")
+    elif not os.path.exists(path):
+        raise SystemExit(f"--readings-cedict: {path} does not exist")
+    return path
+
+
+def _build_one(records, out, a, cedict_words=None, exclude_tags=None, readings_cedict=None):
     """Build one zip. The title is --title (build only) or, absent that, derived
     by build() from whether a CC-CEDICT filter is in play."""
     from .build import build
@@ -89,7 +108,8 @@ def _build_one(records, out, a, cedict_words=None, exclude_tags=None):
         update_base_url = github_release_base_url(repo_from_git_remote())
     stats = build(records, out, title=getattr(a, "title", None), pinyin=a.pinyin, traditional=a.traditional,
                   infobox=a.infobox, cedict_words=cedict_words, exclude_tags=exclude_tags,
-                  revision=a.revision, update_base_url=update_base_url)
+                  revision=a.revision, update_base_url=update_base_url,
+                  readings_cedict=readings_cedict)
     save_stats("build_" + os.path.splitext(os.path.basename(out))[0], stats)
     _print_stats(f"build {out}", stats)
     return stats
@@ -103,7 +123,7 @@ def cmd_build(a) -> int:
         cedict_words = load_simplified_headwords(a.cedict)
         print(f"CC-CEDICT simplified headwords: {len(cedict_words):,}")
     exclude = set(t for t in (a.exclude_tags or "").split(",") if t)
-    _build_one(a.records, a.out, a, cedict_words, exclude)
+    _build_one(a.records, a.out, a, cedict_words, exclude, _readings_cedict(a, fallback=a.cedict))
     if not a.no_validate:
         return cmd_validate(argparse.Namespace(zip=a.out, schemas_dir=a.schemas_dir, engine="auto"))
     return 0
@@ -212,8 +232,9 @@ def cmd_all(a) -> int:
     words = load_simplified_headwords(cedict_path)
     print(f"CC-CEDICT simplified headwords: {len(words):,}")
     exclude = set(t for t in (a.exclude_tags or "").split(",") if t)
-    _build_one(records, DIST_FULL, a)
-    lex = _build_one(records, DIST_LEX, a, words, exclude)
+    readings_cedict = _readings_cedict(a, fallback=cedict_path)
+    _build_one(records, DIST_FULL, a, readings_cedict=readings_cedict)
+    lex = _build_one(records, DIST_LEX, a, words, exclude, readings_cedict)
     rc = 0
     for z in (DIST_FULL, DIST_LEX):
         if getattr(a, "no_validate", False):
@@ -245,7 +266,11 @@ def main(argv=None) -> int:
         sp.add_argument("--no-infobox", action="store_true", help="do not extract 基本信息 key/value pairs")
 
     def add_common_build(sp):
-        sp.add_argument("--pinyin", action="store_true", help="fill the reading field with pypinyin")
+        sp.add_argument("--pinyin", action="store_true",
+                        help="fill the reading field: CC-CEDICT, then the article's own pinyin, then pypinyin")
+        sp.add_argument("--readings-cedict", default=None, metavar="PATH|none",
+                        help="CC-CEDICT export to take readings from (default: the --cedict file, else "
+                             "data/cedict/… when present); 'none' disables it")
         sp.add_argument("--traditional", choices=["s2t", "s2twp", "s2hk"], default=None,
                         help="also emit traditional-script headwords via OpenCC")
         sp.add_argument("--infobox", action="store_true", help="render 基本信息 pairs below the summary")

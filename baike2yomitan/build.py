@@ -14,6 +14,7 @@ import sys
 import time
 import zipfile
 
+from .readings import OVERRIDES_PATH, Readings
 from .records import dumps, iter_records
 from .sense import sense_rank_key
 
@@ -34,23 +35,6 @@ STYLES_CSS = """\
 [data-sc-baike="traditional-term"] { color: #e42566; }
 [data-sc-baike="simplified-term"] { color: #257de4; }
 """
-
-
-def _cjk(text: str) -> bool:
-    return any("一" <= ch <= "鿿" for ch in text)
-
-
-class Pinyin:
-    def __init__(self):
-        from pypinyin import Style, lazy_pinyin  # imported lazily: optional
-
-        self._lazy = lazy_pinyin
-        self._style = Style.TONE
-
-    def __call__(self, text: str) -> str:
-        if not _cjk(text):
-            return ""
-        return " ".join(self._lazy(text, style=self._style, errors="ignore"))
 
 
 class Traditional:
@@ -188,14 +172,18 @@ class _ZipBanks:
         self.buf = []
 
 
-def rank_senses(records_path: str) -> dict[str, dict[tuple, int]]:
+def rank_senses(records_path: str, visit=None) -> dict[str, dict[tuple, int]]:
     """First pass: for titles with more than one sense, rank the senses.
-    Returns title -> {(lemma_id, sense_label, summary[:40]) -> rank}."""
+    Returns title -> {(lemma_id, sense_label, summary[:40]) -> rank}.
+    `visit`, when given, is called with every record (the readings use it
+    to note which titles state their own pinyin)."""
     # Keep only what ranking needs (not the whole record) so the full corpus
     # fits comfortably in memory.
     per_title: dict[str, list] = collections.defaultdict(list)
     for rec in iter_records(records_path):
         per_title[rec["title"]].append((sense_rank_key(rec), _sense_key(rec)))
+        if visit is not None:
+            visit(rec)
     ranks: dict[str, dict[tuple, int]] = {}
     for title, senses in per_title.items():
         if len(senses) < 2:
@@ -219,18 +207,22 @@ def build(records_path: str, out_zip: str, title: str | None = None,
           pinyin: bool = False, traditional: str | None = None, infobox: bool = False,
           cedict_words: set[str] | None = None, exclude_tags: set[str] | None = None,
           merged: bool | None = None, revision: str | None = None,
-          update_base_url: str | None = None) -> collections.Counter:
+          update_base_url: str | None = None, readings_cedict: str | None = None,
+          pinyin_overrides: str | None = OVERRIDES_PATH) -> collections.Counter:
+    """`pinyin` fills the reading field (see readings.py for the sources);
+    `readings_cedict` is the CC-CEDICT export to take readings from and
+    `pinyin_overrides` the hand-checked title/reading file, both optional."""
     stats: collections.Counter = collections.Counter()
     t0 = time.time()
     title = title or default_title(cedict_words)
     stem = os.path.splitext(os.path.basename(out_zip))[0]
     revision = check_revision(revision or default_revision())
-    to_pinyin = Pinyin() if pinyin else None
+    to_reading = Readings(readings_cedict, pinyin_overrides) if pinyin else None
     to_trad = Traditional(traditional) if traditional else None
     exclude_tags = set(exclude_tags or ())
 
     print("  [build] pass 1: ranking senses", file=sys.stderr, flush=True)
-    ranks = rank_senses(records_path)
+    ranks = rank_senses(records_path, visit=to_reading.observe if to_reading else None)
     stats["titles_with_multiple_senses"] = len(ranks)
 
     if merged is None:  # auto-detect: any record carrying an archive snapshot
@@ -255,7 +247,10 @@ def build(records_path: str, out_zip: str, title: str | None = None,
             seq += 1
             tt = to_trad(t) if to_trad else None
             content = structured_content(rec, infobox, tt)
-            reading = to_pinyin(t) if to_pinyin else ""
+            reading = ""
+            if to_reading:
+                reading, reading_source = to_reading(rec)
+                stats["reading:" + reading_source] += 1
             banks.add([t, reading, "", "", score, [content], seq, ""])
             stats["entries"] += 1
             if tt is not None and tt != t:
