@@ -112,6 +112,14 @@ class _FakeGh:
         return ""
 
 
+@pytest.fixture(autouse=True)
+def _not_in_actions(monkeypatch):
+    """The release driver changes behaviour under GitHub Actions; tests decide
+    that explicitly rather than inheriting the runner's environment."""
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
+
+
 @pytest.fixture
 def built_zip(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
