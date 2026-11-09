@@ -199,8 +199,9 @@ reference implementation.
 Yomitan → Settings → Dictionaries → *Import* → pick `dist/baike-full.zip`
 (and/or `dist/baike-lexical.zip`). Each zip is a separate dictionary with a
 distinct title, `百度百科 (full)` and `百度百科 (lexical)`; enable whichever you
-want in the dictionary list. Entries carry
-the single tag `百科`. Headwords are simplified; with `--traditional` the same
+want in the dictionary list. Entries carry no term tags; the dictionary-title
+chip Yomitan draws already names the source. Headwords are simplified; with
+`--traditional` the same
 entries are also reachable from traditional-script text.
 
 ### Showing simplified and traditional together

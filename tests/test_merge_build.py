@@ -147,7 +147,7 @@ def test_build_validate_and_smoke(tmp_path):
     assert validate_zip(str(out), SCHEMA_DIR) == []
     with zipfile.ZipFile(out) as zf:
         names = set(zf.namelist())
-        assert names == {"index.json", "tag_bank_1.json", "term_bank_1.json", "styles.css"}
+        assert names == {"index.json", "term_bank_1.json", "styles.css"}  # no tag bank: entries carry no tags
         assert "traditional-term" in zf.read("styles.css").decode("utf-8")
         idx = json.loads(zf.read("index.json"))
         assert idx["title"] == TITLE_FULL and idx["format"] == 3 and idx["sequenced"] is True
@@ -163,7 +163,7 @@ def test_build_validate_and_smoke(tmp_path):
         scores = {summary_of(e): e[4] for e in zf_entries}
         # real-summary / lower-id sense scores higher than the fallback-summary sense
         assert scores["丈夫，zhàng fū，一般用作名词，已婚女子的配偶。"] > scores["《丈夫》是陈朱煌导演的台湾电影。"]
-        assert all(e[3] == "" and e[2] == "百科" for e in bank)
+        assert all(e[2] == "" and e[3] == "" for e in bank)  # the dictionary-title chip is enough
         e = by_title["红色食品"][0]
         assert e[1] == "hóng sè shí pǐn"
         trad = by_title["紅色食品"][0]
@@ -171,7 +171,6 @@ def test_build_validate_and_smoke(tmp_path):
         head = e[5][0]["content"][0]
         assert head["data"]["baike"] == "terms" and [s["content"] for s in head["content"]] == ["紅色食品", "红色食品"]
         assert trad[5] == e[5]  # same content object, so the same header on both spellings
-        assert json.loads(zf.read("tag_bank_1.json")) == [["百科", "name", 0, "百度百科词条", 0]]
     results = smoke(str(out), extra_random=1, seed=0)
     assert len(results["红色食品"]) == 1 and len(results["丈夫"]) == 2
     assert results["舍利子"] == []

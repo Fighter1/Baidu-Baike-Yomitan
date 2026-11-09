@@ -18,7 +18,6 @@ from .records import dumps, iter_records
 from .sense import sense_rank_key
 
 BANK_SIZE = 10_000
-DICT_TAG = "百科"
 _MUTED = {"fontSize": "80%", "color": "#888888"}
 
 TITLE_FULL = "百度百科 (full)"
@@ -166,9 +165,6 @@ def sidecar_index_path(out_zip: str) -> str:
     return os.path.splitext(out_zip)[0] + ".index.json"
 
 
-TAG_BANK = [[DICT_TAG, "name", 0, "百度百科词条", 0]]
-
-
 class _ZipBanks:
     """Writes term banks of BANK_SIZE entries straight into the zip."""
 
@@ -260,17 +256,16 @@ def build(records_path: str, out_zip: str, title: str | None = None,
             tt = to_trad(t) if to_trad else None
             content = structured_content(rec, infobox, tt)
             reading = to_pinyin(t) if to_pinyin else ""
-            banks.add([t, reading, DICT_TAG, "", score, [content], seq, ""])
+            banks.add([t, reading, "", "", score, [content], seq, ""])
             stats["entries"] += 1
             if tt is not None and tt != t:
-                banks.add([tt, reading, DICT_TAG, "", score, [content], seq, ""])
+                banks.add([tt, reading, "", "", score, [content], seq, ""])
                 stats["entries"] += 1
                 stats["entries_traditional"] += 1
             if stats["records_seen"] % 500_000 == 0:
                 print(f"  [build] {stats['records_seen']:,} records, {stats['entries']:,} entries, "
                       f"{time.time()-t0:,.0f}s", file=sys.stderr, flush=True)
         banks.flush()
-        zf.writestr("tag_bank_1.json", dumps(TAG_BANK))
         zf.writestr("styles.css", STYLES_CSS)
         index = make_index(title, merged, revision=revision, update_base_url=update_base_url, stem=stem)
         zf.writestr("index.json", dumps(index))
