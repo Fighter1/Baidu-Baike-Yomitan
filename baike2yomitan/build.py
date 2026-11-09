@@ -92,13 +92,14 @@ _REVISION_RE = re.compile(r"^(\d+\.)*\d+$")
 
 def default_revision(today: _dt.date | None = None) -> str:
     """Yomitan compares revisions numerically only when both are dot-separated
-    integers with the same number of segments, so always emit three (Y.M.D)."""
-    return (today or _dt.date.today()).strftime("%Y.%m.%d")
+    integers with the same number of segments, so always emit four: Y.M.D.N,
+    where N is a build number (1 locally; the run number in GitHub Actions)."""
+    return (today or _dt.date.today()).strftime("%Y.%m.%d") + ".1"
 
 
 def check_revision(revision: str) -> str:
     if not _REVISION_RE.match(revision):
-        raise ValueError(f"revision {revision!r} must be dot-separated integers (e.g. 2026.11.08) "
+        raise ValueError(f"revision {revision!r} must be dot-separated integers (e.g. 2026.11.09.1) "
                          "so Yomitan can compare it numerically")
     return revision
 

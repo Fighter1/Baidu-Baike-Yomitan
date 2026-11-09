@@ -216,7 +216,10 @@ def cmd_all(a) -> int:
     lex = _build_one(records, DIST_LEX, BASE_TITLE + " (lexical)", a, words, exclude)
     rc = 0
     for z in (DIST_FULL, DIST_LEX):
-        rc |= cmd_validate(argparse.Namespace(zip=z, schemas_dir=a.schemas_dir, engine="auto"))
+        if getattr(a, "no_validate", False):
+            print(f"validation skipped for {z} (--no-validate)")
+        else:
+            rc |= cmd_validate(argparse.Namespace(zip=z, schemas_dir=a.schemas_dir, engine="auto"))
     inter = lex["records_seen"] - lex.get("skip:not_in_cedict", 0)
     save_stats("cedict", {"cedict_headwords": len(words), "records_with_cedict_title": inter,
                           "lexical_entries_after_tag_exclusion": lex["entries"]})
@@ -320,6 +323,7 @@ def main(argv=None) -> int:
     sp = sub.add_parser("all", help="extract (+overlay, merge), build both zips, validate, smoke")
     sp.add_argument("--overlay-hf", action="store_true")
     sp.add_argument("--cedict", default=None)
+    sp.add_argument("--no-validate", action="store_true", help="skip the schema check of both zips (~45 min)")
     add_common_extract(sp)
     add_common_build(sp)
     sp.set_defaults(fn=cmd_all)

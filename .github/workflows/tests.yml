@@ -1,0 +1,50 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install
+        run: python -m pip install -r requirements.txt
+
+      - name: Unit tests (fixtures only, no corpus download)
+        env:
+          PYTHONUTF8: "1"
+        run: python -m pytest -q
+
+      - name: Release dry run against the test fixtures
+        # Builds a tiny zip with the update URLs for this repository and checks
+        # that `release --dry-run` accepts it; nothing is uploaded.
+        env:
+          PYTHONUTF8: "1"
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - "$RUNNER_TEMP/ci-records.jsonl" <<'EOF'
+          import sys
+          from baike2yomitan.records import Record, RecordWriter
+          with RecordWriter(sys.argv[1]) as w:
+              w.write(Record(source="563w", title="红色食品", summary="红色食品是指颜色为红色的食品，如西红柿、红枣等。",
+                             sense_label="", lemma_id=1, tags=[], url="https://baike.baidu.com/view/1.htm", quality_flags=[]))
+          EOF
+          python -m baike2yomitan build --records "$RUNNER_TEMP/ci-records.jsonl" --out "$RUNNER_TEMP/ci-smoke.zip" --update-url github
+          python -m baike2yomitan release "$RUNNER_TEMP/ci-smoke.zip" --dry-run

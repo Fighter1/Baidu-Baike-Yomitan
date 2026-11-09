@@ -28,7 +28,7 @@ def test_update_urls_and_revision_rules():
     assert rel.github_release_base_url(REPO) == BASE
     assert update_urls(BASE + "/", "baike-full") == (BASE + "/baike-full.index.json", BASE + "/baike-full.zip")
     assert check_revision("2026.11.08") == "2026.11.08"
-    assert default_revision(__import__("datetime").date(2026, 11, 8)) == "2026.11.08"
+    assert default_revision(__import__("datetime").date(2026, 11, 8)) == "2026.11.08.1"
     for bad in ("1.0.0-alpha", "v1", "2026.11.", ""):
         with pytest.raises(ValueError):
             check_revision(bad)
@@ -172,6 +172,19 @@ def test_release_dry_run_reports_problems_without_uploading(built_zip, monkeypat
     assert "dry run" in out and "WARNING" in out and "READ access" in out
     assert "--update-url github" in out
     assert not any(c[:2] in (["release", "create"], ["release", "upload"]) for c in gh.calls)
+
+
+def test_release_in_github_actions_skips_permission_probe(built_zip, monkeypatch, capsys):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("GITHUB_REPOSITORY", REPO)
+    gh = _FakeGh(perm=None, private=False)   # the workflow token reports no viewerPermission
+    monkeypatch.setattr(rel, "_gh", gh)
+    monkeypatch.setattr(rel, "repo_from_git_remote", lambda *a, **k: pytest.fail("git remote should not be read"))
+    assert rel.release([built_zip], stats_dir="nowhere") == 0   # repo taken from GITHUB_REPOSITORY
+    out = capsys.readouterr().out
+    assert "(GitHub Actions)" in out and "permission probe skipped" in out
+    assert any(c[:2] == ["release", "create"] and "--repo" in c and c[c.index("--repo") + 1] == REPO
+               for c in gh.calls)
 
 
 def test_release_rejects_zip_without_update_fields(tmp_path, monkeypatch):

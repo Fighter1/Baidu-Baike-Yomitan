@@ -1,0 +1,78 @@
+name: Upstream check
+
+# Weekly: re-resolve the pinned Hugging Face datasets to their current commits.
+# If either moved, open (or refresh) a pull request that updates
+# data/source-inputs.json. Downloads nothing: sizes and SHA-256 values come
+# from the Hugging Face API (LFS object ids).
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-check
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: python -m pip install -r requirements.txt
+
+      - name: Re-pin inputs against Hugging Face
+        env:
+          PYTHONUTF8: "1"
+        run: python -m baike2yomitan inputs pin
+
+      - name: Detect changes (ignoring the generated-date line)
+        id: diff
+        run: |
+          if git diff --quiet -I '"generated":' -- data/source-inputs.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "pinned inputs are current"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff -I '"generated":' -- data/source-inputs.json | tee "$RUNNER_TEMP/manifest.diff"
+          fi
+
+      - name: Open or update the pull request
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch=upstream-inputs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add data/source-inputs.json
+          git commit -m "Pin inputs to current Hugging Face commits"
+          git push --force --set-upstream origin "$branch"
+          {
+            echo "The pinned Hugging Face datasets have new commits."
+            echo
+            echo "Merging this updates \`data/source-inputs.json\`. Then run the **Build and release** workflow"
+            echo "to rebuild the dictionaries from the new inputs (nothing is rebuilt automatically)."
+            echo
+            echo '```diff'
+            cat "$RUNNER_TEMP/manifest.diff"
+            echo '```'
+          } > "$RUNNER_TEMP/body.md"
+          if [ "$(gh pr list --head "$branch" --state open --json number --jq length)" = "0" ]; then
+            gh pr create --base main --head "$branch" --title "Upstream inputs changed" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr edit "$branch" --body-file "$RUNNER_TEMP/body.md"
+          fi

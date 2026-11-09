@@ -100,10 +100,10 @@ stops after N input rows for fast iteration.
 | `--cedict PATH` | build | keep only records whose title is a simplified CC-CEDICT headword (the lexical build); `all` downloads the MDBG export when missing |
 | `--exclude-tags a,b` | build, all | drop records carrying any of these Baike tags; `all` applies it to the lexical build only |
 | `--title` | build | override the dictionary title stored in `index.json` |
-| `--revision R` | build, all | `index.json` revision; dot-separated integers only (default: today as `2026.11.08`) |
+| `--revision R` | build, all | `index.json` revision; dot-separated integers only (default: today plus `.1`, e.g. `2026.11.09.1`) |
 | `--update-url BASE\|github` | build, all | make the zip self-updating: `index.json` gets `isUpdatable` + `indexUrl`/`downloadUrl` under `BASE`; `github` derives `https://github.com/<owner>/<repo>/releases/latest/download` from the `origin` remote |
 | `--repo`, `--tag`, `--title`, `--notes-file`, `--draft`, `--dry-run` | release | see *Self-updating dictionaries* below |
-| `--no-validate` | build | skip the schema check after building |
+| `--no-validate` | build, all | skip the schema check after building (~45 min for the full zip) |
 | `--engine auto\|fast\|jsonschema` | validate | fastjsonschema when installed (default), or the reference implementation |
 | `--schemas-dir`, `--seed` | build, validate, smoke, sample | where the Yomitan schemas are cached; seed for the random smoke/sample picks |
 
@@ -224,10 +224,12 @@ Yomitan can update a dictionary by itself when its `index.json` carries
 Dictionaries → Check for updates* fetches `indexUrl`, compares its `revision`
 with the installed one and offers the `downloadUrl` zip when it is newer.
 Revisions are compared numerically only when both are dot-separated integers
-with the same number of segments, which is why the builder always writes three
-(`2026.11.08`); pass `--revision` for a second build on the same day
-(`2026.11.8.2` would *not* compare numerically against `2026.11.08`, so keep
-three segments, e.g. bump the day).
+with the same number of segments, which is why the builder always writes four:
+`Y.M.D.N` (`2026.11.09.1` locally; the GitHub Actions build uses the run number
+as `N`). Pass `--revision` to override, and keep four segments. (The first
+release, `2026.11.08`, had three; Yomitan falls back to a string comparison
+when the counts differ, and for every later date that comparison still orders
+correctly.)
 
 GitHub's `…/releases/latest/download/<asset>` URL always points at the newest
 non-draft release, so it is a stable target for both fields. The flow:
@@ -269,6 +271,27 @@ with the same content. `release` then, through the `gh` CLI:
 reports problems as warnings instead of stopping. Users then import the zip
 once; later releases reach them through *Check for updates*. The zips built
 without `--update-url` are not self-updating and `release` rejects them.
+
+## GitHub Actions
+
+Three workflows under `.github/workflows/`:
+
+| workflow | trigger | what it does |
+|---|---|---|
+| `tests.yml` | every push to `main`, every pull request | installs requirements on Python 3.11 and 3.12, runs pytest (fixtures only, no corpus), builds a one-entry zip with this repository's update URLs and runs `release --dry-run` on it |
+| `upstream-check.yml` | Mondays 06:00 UTC, or manually | runs `inputs pin`; if a dataset commit changed, pushes branch `upstream-inputs` and opens (or refreshes) a pull request with the manifest diff. Downloads nothing |
+| `build-release.yml` | manual only (*Actions → Build and release → Run workflow*) | frees runner disk, downloads the pinned corpora, runs `all` with `--update-url github` and revision `UTC-date.run-number`, uploads the reports as an artifact and publishes the release as *latest*. Inputs: `publish` (off keeps the zips as a 7-day artifact instead), `skip_validation`, `revision` |
+
+The full build needs roughly 27 GB of disk (16.8 GB primary, 2.2 GB overlay,
+6.6 GB of record files, 1.3 GB zip) and about 90 minutes, 45 of them the schema
+validation. Standard runners fit that only after the *Free disk space* step; the
+16.8 GB file cannot be cached between runs (10 GB cache limit), so every run
+downloads it again. Memory use has not been measured on a 7 GB runner. The
+release step uses the workflow's `GITHUB_TOKEN` (`permissions: contents:
+write`); the `release` command skips its account-permission probe when it
+detects GitHub Actions. Pull requests opened by the upstream check come from
+the workflow token, so they do not trigger the tests workflow themselves; the
+tests run once the branch is pushed by a person or when the PR is merged.
 
 ## Tests
 

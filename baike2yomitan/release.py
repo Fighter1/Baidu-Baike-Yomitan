@@ -225,8 +225,9 @@ def release(zips: list[str], *, repo: str | None = None, tag: str | None = None,
     if shutil.which("gh") is None:
         problem("the GitHub CLI `gh` is not on PATH (https://cli.github.com); `gh auth login` after installing")
 
-    repo = repo or repo_from_git_remote()
-    print(f"repository: {repo}", file=out)
+    in_actions = os.environ.get("GITHUB_ACTIONS") == "true"
+    repo = repo or (os.environ.get("GITHUB_REPOSITORY") if in_actions else None) or repo_from_git_remote()
+    print(f"repository: {repo}" + (" (GitHub Actions)" if in_actions else ""), file=out)
 
     info: dict = {}
     if shutil.which("gh"):
@@ -237,8 +238,14 @@ def release(zips: list[str], *, repo: str | None = None, tag: str | None = None,
     if info:
         perm = info.get("viewerPermission")
         if perm not in WRITE_PERMISSIONS:
-            problem(f"the gh account has {perm} access to {repo}; creating a release needs write access "
-                    "(`gh auth login` / `gh auth switch` to the repository owner, or pass --repo)")
+            if in_actions:
+                # The workflow token is an app installation, not a user, so GraphQL
+                # reports no viewerPermission for it. `permissions: contents: write`
+                # in the workflow is what matters; the upload itself fails without it.
+                print(f"  permission probe skipped in GitHub Actions (viewerPermission={perm})", file=out)
+            else:
+                problem(f"the gh account has {perm} access to {repo}; creating a release needs write access "
+                        "(`gh auth login` / `gh auth switch` to the repository owner, or pass --repo)")
         if info.get("isPrivate"):
             warnings.append(f"{repo} is private: Yomitan cannot download assets from a private repository "
                             "(it sends no auth header), so auto-update will not work until it is public; "

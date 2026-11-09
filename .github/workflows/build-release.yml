@@ -1,0 +1,106 @@
+name: Build and release
+
+# Manual: download the pinned corpora (16.8 GB + 2.2 GB), run the whole
+# pipeline and publish both zips as the latest GitHub release so Yomitan's
+# "Check for updates" picks them up. Needs ~27 GB of disk and about 90 minutes
+# on a standard runner (the schema validation of the full zip is ~45 of those).
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish a GitHub release (off: build only, zips kept as a workflow artifact)"
+        type: boolean
+        default: true
+      skip_validation:
+        description: "Skip the ~45 min schema validation of both zips"
+        type: boolean
+        default: false
+      revision:
+        description: "index.json revision, dot-separated integers (default: UTC date + run number, e.g. 2026.11.09.12)"
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      PYTHONUTF8: "1"
+      HF_HUB_ENABLE_HF_TRANSFER: "1"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Free disk space
+        # Standard runners have ~14 GB documented / ~25 GB real free space; the
+        # pipeline needs ~27 GB. Removing preinstalled toolchains frees 20+ GB.
+        run: |
+          df -h / | tail -1
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \
+                      /usr/local/.ghcup /usr/share/swift /usr/local/share/boost /usr/lib/jvm \
+                      /usr/local/share/chromium /usr/local/lib/node_modules "$AGENT_TOOLSDIRECTORY" || true
+          sudo docker image prune --all --force > /dev/null 2>&1 || true
+          sudo apt-get clean > /dev/null 2>&1 || true
+          df -h / | tail -1
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: python -m pip install -r requirements.txt
+
+      - name: Choose the revision
+        run: |
+          rev="${{ inputs.revision }}"
+          [ -n "$rev" ] || rev="$(date -u +%Y.%m.%d).${{ github.run_number }}"
+          echo "REVISION=$rev" >> "$GITHUB_ENV"
+          echo "revision $rev"
+
+      - name: Download the pinned inputs (verifies size and SHA-256)
+        run: |
+          python -m baike2yomitan inputs download
+          df -h / | tail -1
+
+      - name: Extract, merge, build, validate, smoke
+        run: |
+          python -m baike2yomitan all --overlay-hf --pinyin --traditional s2t --infobox \
+            --exclude-tags 人物,企业,学校 --update-url github --revision "$REVISION" --no-hash \
+            ${{ inputs.skip_validation && '--no-validate' || '' }} | tee data/all.log
+          df -h / | tail -1
+          ls -l dist/
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ env.REVISION }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            data/extract_report.md
+            data/all.log
+            data/stats/*.json
+            dist/*.index.json
+
+      - name: Upload zips as an artifact (build-only run)
+        if: ${{ !inputs.publish }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dictionaries-${{ env.REVISION }}
+          retention-days: 7
+          path: dist/*.zip
+
+      - name: Publish the release
+        if: ${{ inputs.publish }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m baike2yomitan release --tag "v$REVISION"
