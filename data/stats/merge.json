@@ -1,0 +1,13 @@
+{
+ "added": 171837,
+ "added_extra_sense_of_known_title": 52927,
+ "added_new_title": 118910,
+ "key": "title",
+ "overlay_records": 382823,
+ "primary_records": 4716938,
+ "records_written": 4888775,
+ "refreshed": 210986,
+ "skipped": 19171,
+ "skipped_overlay_ambiguous_or_unclean": 19103,
+ "skipped_primary_title_ambiguous": 68
+}

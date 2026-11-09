@@ -1,0 +1,20 @@
+  [build] pass 1: ranking senses
+  [build] pass 2: writing term banks
+  [build] 500,000 records, 901,124 entries, 76s
+  [build] 1,000,000 records, 1,803,457 entries, 125s
+  [build] 1,500,000 records, 2,708,468 entries, 171s
+  [build] 2,000,000 records, 3,614,325 entries, 213s
+  [build] 2,500,000 records, 4,517,923 entries, 253s
+  [build] 3,000,000 records, 5,418,059 entries, 293s
+  [build] 3,500,000 records, 6,322,975 entries, 332s
+  [build] 4,000,000 records, 7,228,568 entries, 371s
+  [build] 4,500,000 records, 8,133,631 entries, 410s
+
+== build dist/baike-full.zip ==
+  entries                                     8,817,011
+  entries_traditional                         3,928,236
+  records_seen                                4,888,775
+  seconds                                           439
+  term_banks                                        882
+  titles_with_multiple_senses                    32,691
+  zip_bytes                                1,304,878,273

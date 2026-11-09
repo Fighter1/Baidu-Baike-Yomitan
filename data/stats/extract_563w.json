@@ -1,0 +1,22 @@
+{
+ "drop:dup_lemma_id": 244,
+ "drop:dup_title_summary": 371,
+ "drop:no_summary_no_sections": 208407,
+ "drop:summary_not_prose_fallback": 70771,
+ "drop:summary_too_short": 471888,
+ "drop:summary_too_short_fallback": 150309,
+ "drop:title_empty": 13,
+ "drop:title_too_long": 15957,
+ "flag:kept_alias_line": 154,
+ "flag:kept_short_sentence": 11075,
+ "flag:sense_label_from_section": 40651,
+ "flag:summary_from_later_paragraph": 1343535,
+ "flag:summary_from_section": 2675004,
+ "flag:summary_from_section_after_short_summary": 60128,
+ "input": "data\\raw\\563w\\563w_baidubaike.json",
+ "input_rows": 5634898,
+ "layout:jsonl": 1,
+ "output": "data\\records.jsonl",
+ "records_written": 4716938,
+ "seconds": 761
+}

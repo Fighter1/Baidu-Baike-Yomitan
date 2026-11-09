@@ -1,0 +1,33 @@
+  [build] pass 1: ranking senses
+  [build] pass 2: writing term banks
+  [validate] term_bank_1.json: ok (10000)
+  [validate] term_bank_2.json: ok (10000)
+  [validate] term_bank_3.json: ok (10000)
+  [validate] term_bank_4.json: ok (10000)
+  [validate] term_bank_5.json: ok (10000)
+  [validate] term_bank_6.json: ok (10000)
+  [validate] term_bank_7.json: ok (10000)
+  [validate] term_bank_8.json: ok (10000)
+  [validate] term_bank_9.json: ok (10000)
+  [validate] term_bank_10.json: ok (10000)
+  [validate] term_bank_11.json: ok (10000)
+  [validate] term_bank_12.json: ok (10000)
+  [validate] term_bank_13.json: ok (10000)
+  [validate] term_bank_14.json: ok (10000)
+  [validate] term_bank_15.json: ok (10000)
+  [validate] term_bank_16.json: ok (9702)
+  [validate] tag_bank_1.json: ok (1)
+  [validate] index.json: ok (index)
+CC-CEDICT simplified headwords: 121,612
+
+== build dist/baike-lexical.zip ==
+  entries                                       159,702
+  entries_traditional                            60,785
+  records_seen                                4,888,775
+  seconds                                            48
+  skip:excluded_tag                               3,832
+  skip:not_in_cedict                          4,786,026
+  term_banks                                         16
+  titles_with_multiple_senses                    32,691
+  zip_bytes                                  25,112,404
+VALIDATION OK: dist/baike-lexical.zip

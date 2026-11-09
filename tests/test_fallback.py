@@ -1,0 +1,131 @@
+"""Summary fallback for 563w pages whose first paragraph is an infobox line,
+a pinyin line or a heading (shapes copied from real dropped rows)."""
+import collections
+
+from baike2yomitan.cleaning import (is_key_value_line, is_summary_candidate,
+                                    short_summary_keep_reason)
+from baike2yomitan.extract_563w import convert, find_fallback_summary
+
+
+def _row(title, summary, sections, lid=123):
+    return {"title": title, "summary": summary, "tags": [], "url": f"http://baike.baidu.com/view/{lid}.htm",
+            "sections": [{"title": t, "content": c} for t, c in sections]}
+
+
+def test_key_value_line_detection():
+    assert is_key_value_line("作者：徐汉林编著")
+    assert is_key_value_line("I S B N：9787801383617")
+    assert is_key_value_line("·ISBN：7532120198")
+    assert is_key_value_line("CPU类型：Core i7/Core i5/Core i3")
+    assert not is_key_value_line("【特点】颜色金黄，肥肠，外焦内嫩，咸甜味香。")
+    assert not is_key_value_line("1、玩具、小摆设或有趣的事物；也泛指东西：小玩意|他手里拿的是什么玩意。")
+    assert not is_key_value_line("苏洵，字明允号老泉。")
+
+
+def test_summary_candidate_rules():
+    assert is_summary_candidate("虢仲簠，西周晚期。1992年12月河南三门峡市上村岭虢国墓地。")
+    assert not is_summary_candidate("I S B N：9787801383617")        # infobox line
+    assert not is_summary_candidate("Neil Diamond was born in 1941")  # no Chinese
+    assert not is_summary_candidate("苏洵，字明允号老泉。")             # too short
+
+
+def test_null_summary_infobox_first_then_prose():
+    # 新疆远志-shaped page: 基本信息 infobox, real text in a later section
+    raw = _row("新疆远志", None, [
+        ("基本信息", "药名：新疆远志\\n汉语拼音：xin jiang yuan zhi\\n拉丁植物动物矿物名：Polygala hybrida DC."),
+        ("来源", "为远志科植物新疆远志的根。多年生草本，高10-30厘米，根粗壮，木质。"),
+    ])
+    stats = collections.Counter()
+    rec = convert(raw, stats, 300, want_infobox=True)
+    assert rec is not None
+    assert rec.summary.startswith("为远志科植物新疆远志的根")
+    assert "summary_from_section" in rec.quality_flags
+    assert "summary_from_later_paragraph" in rec.quality_flags
+    assert stats["flag:summary_from_later_paragraph"] == 1
+    assert rec.infobox == [["药名", "新疆远志"], ["汉语拼音", "xin jiang yuan zhi"],
+                           ["拉丁植物动物矿物名", "Polygala hybrida DC."]]
+
+
+def test_null_summary_second_paragraph_of_first_section():
+    # 玩意-shaped page: pinyin line, then the gloss in the same section
+    raw = _row("玩意", None, [
+        ("玩意：", "wán yì\\n1、玩具、小摆设或有趣的事物；也泛指东西：小玩意|他手里拿的是什么玩意。"),
+    ])
+    rec = convert(raw, collections.Counter(), 300, want_infobox=False)
+    assert rec.summary.startswith("1、玩具、小摆设")
+    assert "summary_from_later_paragraph" in rec.quality_flags
+
+
+def test_null_summary_first_paragraph_is_prose_keeps_old_behaviour():
+    raw = _row("费某", None, [("生平", "费萨尔·伊本·侯赛因是伊拉克王国的第一任国王，1921年即位。\\n第二段。")])
+    rec = convert(raw, collections.Counter(), 300, want_infobox=False)
+    assert rec.summary.startswith("费萨尔·伊本·侯赛因")
+    assert rec.quality_flags == ["summary_from_section"]
+
+
+def test_null_summary_only_infobox_lines_is_dropped():
+    raw = _row("通胀预期下的理财之道", None, [
+        ("图书信息", "通胀预期下的理财之道\\nI S B N：9787111296096\\n定价：￥32.00 作者：张某某著\\n出版社：机械工业出版社"),
+    ])
+    stats = collections.Counter()
+    assert convert(raw, stats, 300, want_infobox=False) is None
+    assert stats["drop:summary_too_short_fallback"] == 1
+    assert find_fallback_summary(raw["sections"]) is None
+
+
+def test_short_summary_field_rescued_from_later_section():
+    # 兔褐-shaped page: summary field holds pinyin only, gloss in the second section
+    raw = _row("兔褐", "tù hè ㄊㄨˋ ㄏㄜˋ", [
+        ("词语注音", "tù hè ㄊㄨˋ ㄏㄜˋ"),
+        ("词语释义", "(1).兔毛布。唐李肇《唐国史补》卷下：“宣州以兔毛为褐，亚于锦绮。”"),
+    ])
+    stats = collections.Counter()
+    rec = convert(raw, stats, 300, want_infobox=False)
+    assert rec.summary.startswith("(1).兔毛布")
+    assert "summary_from_section" in rec.quality_flags and "summary_from_later_paragraph" in rec.quality_flags
+    assert stats["flag:summary_from_section_after_short_summary"] == 1
+
+
+def test_short_summary_field_without_sections_is_dropped():
+    raw = _row("英国电影学院", "英国电影学院\\n", [])
+    stats = collections.Counter()
+    assert convert(raw, stats, 300, want_infobox=False) is None
+    assert stats["drop:summary_too_short"] == 1
+
+
+def test_short_summary_keep_reason():
+    assert short_summary_keep_reason("泉州市的别称。", "剌桐城") == "short_sentence"
+    assert short_summary_keep_reason("紫衫军是洛杉矶湖人队的别称。", "紫衫军") == "short_sentence"
+    assert short_summary_keep_reason("吴国将领，诸葛谨后代。", "诸葛壹") == "short_sentence"
+    assert short_summary_keep_reason("别称：四六不懂", "不着四六") == "alias_line"
+    assert short_summary_keep_reason("【别名】：山右", "山西") == "alias_line"
+    # still dropped: title only, heading, pinyin, other infobox lines, empty alias
+    assert short_summary_keep_reason("英国电影学院", "英国电影学院") is None
+    assert short_summary_keep_reason("山右。", "山右") is None
+    assert short_summary_keep_reason("公司简介", "某公司") is None
+    assert short_summary_keep_reason("fú shù ㄈㄨˊ ㄕㄨˋ", "扶树") is None
+    assert short_summary_keep_reason("姓名：谢志敏", "谢志敏") is None
+    assert short_summary_keep_reason("别称：", "某词") is None
+    assert short_summary_keep_reason("别称：某词", "某词") is None
+    assert short_summary_keep_reason("中共松阳县委常委、统战部部长", "蒋璟璟") is None  # no sentence mark
+
+
+def test_short_sentence_and_alias_stubs_are_kept():
+    stats = collections.Counter()
+    rec = convert(_row("剌桐城", "泉州市的别称。", []), stats, 300, want_infobox=False)
+    assert rec is not None and rec.summary == "泉州市的别称。"
+    assert rec.quality_flags == ["kept_short_sentence"]
+    rec = convert(_row("不着四六", "别称：四六不懂 ", []), stats, 300, want_infobox=False)
+    assert rec is not None and rec.summary == "别称：四六不懂"
+    assert rec.quality_flags == ["kept_alias_line"]
+    assert stats["flag:kept_short_sentence"] == 1 and stats["flag:kept_alias_line"] == 1
+    # a section-less stub that is only an infobox line with another key stays dropped
+    assert convert(_row("谢志敏", "姓名：谢志敏", []), stats, 300, want_infobox=False) is None
+    assert stats["drop:summary_too_short"] == 1
+
+
+def test_longer_paragraph_still_preferred_over_short_sentence():
+    raw = _row("玩意", "玩具。", [("释义", "wán yì\\n1、玩具、小摆设或有趣的事物；也泛指东西。")])
+    rec = convert(raw, collections.Counter(), 300, want_infobox=False)
+    assert rec.summary.startswith("1、玩具、小摆设")
+    assert "kept_short_sentence" not in rec.quality_flags

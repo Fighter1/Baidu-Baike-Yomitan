@@ -1,0 +1,20 @@
+{
+ "default_senses": 340016,
+ "drop:disambiguation_page": 29741,
+ "drop:obfuscated_no_clean_duplicate": 44353,
+ "drop:summary_too_short": 740,
+ "drop:summary_too_short_fallback": 608,
+ "drop:title_empty": 6,
+ "drop:title_too_long": 265,
+ "dup:idless_same_summary": 6486,
+ "dup:lemma_id": 4252,
+ "dup:title_subtitle": 118545,
+ "flag:abstract_fallback": 21357,
+ "flag:kept_short_sentence": 4020,
+ "flag:no_lemma_id": 46862,
+ "input": "data\\raw\\overlay",
+ "input_rows": 587819,
+ "output": "data\\records.hf.jsonl",
+ "records_written": 382823,
+ "seconds": 512
+}

@@ -1,0 +1,47 @@
+  [563w] 200,000 rows, 168,028 records, 22s
+  [563w] 600,000 rows, 499,392 records, 59s
+  [563w] 800,000 rows, 663,556 records, 79s
+  [563w] 1,000,000 rows, 830,130 records, 101s
+  [563w] 1,200,000 rows, 998,191 records, 126s
+  [563w] 1,600,000 rows, 1,335,572 records, 177s
+  [563w] 1,800,000 rows, 1,502,467 records, 212s
+  [563w] 2,000,000 rows, 1,672,449 records, 246s
+  [563w] 2,200,000 rows, 1,839,463 records, 278s
+  [563w] 2,400,000 rows, 2,009,547 records, 313s
+  [563w] 2,600,000 rows, 2,175,638 records, 343s
+  [563w] 3,000,000 rows, 2,512,194 records, 386s
+  [563w] 3,400,000 rows, 2,843,163 records, 431s
+  [563w] 3,600,000 rows, 3,007,771 records, 453s
+  [563w] 3,800,000 rows, 3,172,855 records, 473s
+  [563w] 4,000,000 rows, 3,340,923 records, 493s
+  [563w] 4,200,000 rows, 3,509,946 records, 514s
+  [563w] 4,400,000 rows, 3,678,559 records, 542s
+  [563w] 4,600,000 rows, 3,845,747 records, 580s
+  [563w] 4,800,000 rows, 4,016,047 records, 616s
+  [563w] 5,000,000 rows, 4,182,583 records, 653s
+  [563w] 5,200,000 rows, 4,353,445 records, 685s
+  [563w] 5,400,000 rows, 4,518,948 records, 719s
+  [563w] 5,600,000 rows, 4,688,657 records, 755s
+
+== extract 563w ==
+  drop:dup_lemma_id                                 244
+  drop:dup_title_summary                            371
+  drop:no_summary_no_sections                   208,407
+  drop:summary_not_prose_fallback                70,771
+  drop:summary_too_short                        471,888
+  drop:summary_too_short_fallback               150,309
+  drop:title_empty                                   13
+  drop:title_too_long                            15,957
+  flag:kept_alias_line                              154
+  flag:kept_short_sentence                       11,075
+  flag:sense_label_from_section                  40,651
+  flag:summary_from_later_paragraph           1,343,535
+  flag:summary_from_section                   2,675,004
+  flag:summary_from_section_after_short_summary       60,128
+  input                                    data\raw\563w\563w_baidubaike.json
+  input_rows                                  5,634,898
+  layout:jsonl                                        1
+  output                                   data\records.jsonl
+  records_written                             4,716,938
+  seconds                                           761
+report: data\extract_report.md

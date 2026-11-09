@@ -1,0 +1,26 @@
+  [hf] 100,000 rows, 76,110 unique senses, 121s
+  [hf] 200,000 rows, 151,389 unique senses, 229s
+  [hf] 300,000 rows, 224,895 unique senses, 311s
+  [hf] 400,000 rows, 298,221 unique senses, 388s
+  [hf] 500,000 rows, 371,307 unique senses, 449s
+
+== extract hf ==
+  default_senses                                340,016
+  drop:disambiguation_page                       29,741
+  drop:obfuscated_no_clean_duplicate             44,353
+  drop:summary_too_short                            740
+  drop:summary_too_short_fallback                   608
+  drop:title_empty                                    6
+  drop:title_too_long                               265
+  dup:idless_same_summary                         6,486
+  dup:lemma_id                                    4,252
+  dup:title_subtitle                            118,545
+  flag:abstract_fallback                         21,357
+  flag:kept_short_sentence                        4,020
+  flag:no_lemma_id                               46,862
+  input                                    data\raw\overlay
+  input_rows                                    587,819
+  output                                   data\records.hf.jsonl
+  records_written                               382,823
+  seconds                                           512
+report: data\extract_report.md
