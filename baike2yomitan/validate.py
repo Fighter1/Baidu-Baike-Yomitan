@@ -17,7 +17,7 @@ SCHEMA_FILES = {
 }
 SCHEMA_BASE = "https://raw.githubusercontent.com/yomidevs/yomitan/master/ext/data/schemas/"
 DEFAULT_SCHEMA_DIR = os.path.join("data", "schemas")
-SMOKE_TITLES = ["红色食品", "丈夫", "舍利子", "疝气", "Θ", "小隐于野大隐于市"]
+SMOKE_TITLES = ["红色食品", "丈夫", "时间", "舍利子", "疝气", "Θ", "小隐于野大隐于市"]
 
 
 def fetch_schemas(schema_dir: str = DEFAULT_SCHEMA_DIR, force: bool = False) -> dict[str, str]:
@@ -107,12 +107,92 @@ def worker_count(requested: int | None, tasks: int, platform: str = sys.platform
     return max(1, n)
 
 
-_worker: dict = {}  # per-process state: the open zip and the compiled schemas
+# --- validating by shape ------------------------------------------------------
+#
+# The term bank schema is slow on these entries (about 6 s of CPU per 10,000,
+# almost all in the recursive structured-content rules), yet it only constrains
+# structure: tag names, the enumerated style and image values, and the scheme of
+# an href. The text of an entry is free. Millions of entries therefore share a
+# few dozen shapes, and an entry is valid exactly when its shape is.
+
+MODES = ("shape", "full")
+FULL_SAMPLE = 3  # term banks that shape mode also puts through the whole schema
+_HREF_SCHEME_RE = re.compile(r"(?:https?:|\?)")  # the part of an href the schema's pattern looks at
 
 
-def _init_worker(zip_path: str, schema_dir: str, engine: str) -> None:
+def content_shape(node):
+    """A definition with everything the schema does not look at blanked out:
+    text content, the values under `data`, and an href past its scheme. Tags,
+    types, styles and every other attribute are kept as they are."""
+    if isinstance(node, str):
+        return ""
+    if isinstance(node, list):
+        return [content_shape(n) for n in node]
+    if isinstance(node, dict):
+        out = {}
+        for k, v in node.items():
+            if k == "content":
+                out[k] = content_shape(v)
+            elif k == "data" and isinstance(v, dict):
+                out[k] = {dk: "" if isinstance(dv, str) else dv for dk, dv in v.items()}
+            elif k == "href" and isinstance(v, str):
+                m = _HREF_SCHEME_RE.match(v)
+                out[k] = m.group(0) if m else v
+            else:
+                out[k] = v
+        return out
+    return node
+
+
+def _row_problem(row) -> str | None:
+    """The eight fields of a term row, checked without the schema."""
+    if not isinstance(row, list) or len(row) != 8:
+        return "must be an array of exactly 8 items"
+    term, reading, definition_tags, rules, score, definitions, sequence, term_tags = row
+    for label, value in (("term", term), ("reading", reading), ("rules", rules), ("term tags", term_tags)):
+        if not isinstance(value, str):
+            return f"{label} must be a string"
+    if definition_tags is not None and not isinstance(definition_tags, str):
+        return "definition tags must be a string or null"
+    if isinstance(score, bool) or not isinstance(score, (int, float)):
+        return "score must be a number"
+    if isinstance(sequence, bool) or not isinstance(sequence, int):
+        return "sequence must be an integer"
+    if not isinstance(definitions, list):
+        return "definitions must be an array"
+    return None
+
+
+def check_term_bank_by_shape(data, check, shapes: dict, max_errors: int = 20) -> list[str]:
+    """Error messages for one term bank. `check` is the schema validator for a
+    bank; it is called once per distinct shape, and `shapes` remembers the
+    answers for the rest of the process."""
+    if not isinstance(data, list):
+        return check(data)
+    errors: list[str] = []
+    for i, row in enumerate(data):
+        problem = _row_problem(row)
+        if problem is None:
+            shape = content_shape(row[5])
+            key = json.dumps(shape, ensure_ascii=False, sort_keys=True)
+            found = shapes.get(key)
+            if found is None:
+                found = shapes[key] = check([["", "", None, "", 0, shape, 0, ""]])
+            problem = "; ".join(found) if found else None
+        if problem:
+            errors.append(f"entry {i} ({row[0]!r}): {problem}" if isinstance(row, list) and row else f"entry {i}: {problem}")
+            if len(errors) >= max_errors:
+                break
+    return errors
+
+
+_worker: dict = {}  # per-process state: the open zip, the compiled schemas, the shapes seen
+
+
+def _init_worker(zip_path: str, schema_dir: str, engine: str, mode: str = "full", full_names: tuple = ()) -> None:
     _worker["zip"] = zipfile.ZipFile(zip_path)
     _worker["validators"] = _make_validators(load_schemas(schema_dir), engine)
+    _worker["mode"], _worker["full_names"], _worker["shapes"] = mode, set(full_names), {}
 
 
 def _check_member(task: tuple[str, str]) -> tuple[str, str, list[str]]:
@@ -122,17 +202,37 @@ def _check_member(task: tuple[str, str]) -> tuple[str, str, list[str]]:
     errors = []
     if kind == "term" and len(data) > 10_000:
         errors.append(f"{len(data)} entries (> 10000)")
-    errors.extend(_worker["validators"][kind](data))
+    check = _worker["validators"][kind]
+    by_shape = kind == "term" and _worker.get("mode") == "shape"
+    if by_shape:
+        errors.extend(check_term_bank_by_shape(data, check, _worker["shapes"]))
+    if not by_shape or name in _worker.get("full_names", ()):
+        full = check(data)
+        if by_shape and full and not errors:
+            full = [f"the whole-schema check disagrees with the shape check: {m}" for m in full]
+        errors.extend(m for m in full if not by_shape or not errors or m.startswith("the whole"))
     return name, str(len(data)) if isinstance(data, list) else "index", errors
 
 
+def _full_sample(term_banks: list[str]) -> tuple:
+    """First, middle and last term bank: checked both ways in shape mode."""
+    if len(term_banks) <= FULL_SAMPLE:
+        return tuple(term_banks)
+    return (term_banks[0], term_banks[len(term_banks) // 2], term_banks[-1])
+
+
 def validate_zip(zip_path: str, schema_dir: str = DEFAULT_SCHEMA_DIR, max_errors: int = 20,
-                 engine: str = "auto", workers: int | None = None) -> list[str]:
+                 engine: str = "auto", workers: int | None = None, mode: str = "shape") -> list[str]:
     """Return a list of error strings (empty = valid).
 
-    The schema check is CPU-bound (~6 s per 10,000-entry term bank) and the
-    zip members are independent, so they are spread over `workers` processes
-    (default: every core). Progress lines and errors keep the zip's order."""
+    `mode="shape"` (default) validates each distinct entry shape once, see
+    above, and puts three term banks through the whole schema as a cross-check.
+    `mode="full"` runs the schema over every entry (~6 s of CPU per
+    10,000-entry term bank). Either way the zip members are independent and
+    are spread over `workers` processes (default: every core). Progress lines
+    and errors keep the zip's order."""
+    if mode not in MODES:
+        raise ValueError(f"mode must be one of {MODES}, not {mode!r}")
     load_schemas(schema_dir)  # download them once, before any worker looks
     errors: list[str] = []
     with zipfile.ZipFile(zip_path) as zf:
@@ -160,16 +260,18 @@ def validate_zip(zip_path: str, schema_dir: str = DEFAULT_SCHEMA_DIR, max_errors
             status = f"{len(member_errors)} error(s)" if member_errors else f"ok ({size})"
             print(f"  [validate] {name}: {status}", file=sys.stderr, flush=True)
 
+    full_names = _full_sample([n for n, kind in tasks if kind == "term"]) if mode == "shape" else ()
     workers = worker_count(workers, len(tasks))
     if workers == 1:
-        _init_worker(zip_path, schema_dir, engine)
+        _init_worker(zip_path, schema_dir, engine, mode, full_names)
         try:
             collect(map(_check_member, tasks))
         finally:
             _worker.pop("zip").close()
             _worker.clear()
     else:
-        pool = ProcessPoolExecutor(workers, initializer=_init_worker, initargs=(zip_path, schema_dir, engine))
+        pool = ProcessPoolExecutor(workers, initializer=_init_worker,
+                                   initargs=(zip_path, schema_dir, engine, mode, full_names))
         try:
             collect(pool.map(_check_member, tasks))
         finally:
@@ -237,10 +339,13 @@ def print_smoke(results: dict[str, list[str]]) -> bool:
             print("  " + d.replace("\n", "\n  ").rstrip())
     n_hong = len(results.get("红色食品", []))
     n_zf = len(results.get("丈夫", []))
+    n_sj = len(results.get("时间", []))
     if n_hong != 1:
         print(f"\nSMOKE FAIL: 红色食品 appears {n_hong} times (expected 1)")
         ok = False
-    if n_zf < 2:
-        print(f"\nSMOKE WARN: 丈夫 shows {n_zf} sense(s) (expected > 1)")
-        ok = ok and n_zf >= 1
+    if n_zf < 1:
+        print("\nSMOKE FAIL: 丈夫 is missing")
+        ok = False
+    if n_sj < 2:  # a title with several articles: the word, the physical quantity, songs
+        print(f"\nSMOKE WARN: 时间 shows {n_sj} sense(s) (expected > 1)")
     return ok
