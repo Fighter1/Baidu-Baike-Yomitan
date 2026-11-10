@@ -2,8 +2,8 @@
 a pinyin line or a heading (shapes copied from real dropped rows)."""
 import collections
 
-from baike2yomitan.cleaning import (is_key_value_line, is_summary_candidate,
-                                    short_summary_keep_reason)
+from baike2yomitan.cleaning import (continues_on_next_line, is_key_value_line, is_summary_candidate,
+                                    join_lines, short_summary_keep_reason)
 from baike2yomitan.extract_563w import convert, find_fallback_summary
 
 
@@ -129,3 +129,47 @@ def test_longer_paragraph_still_preferred_over_short_sentence():
     rec = convert(raw, collections.Counter(), 300, want_infobox=False)
     assert rec.summary.startswith("1、玩具、小摆设")
     assert "kept_short_sentence" not in rec.quality_flags
+
+
+def test_line_break_inside_a_quote_is_detected():
+    assert continues_on_next_line("为了叫起来顺嘴总不能叫“我开你一砖", "头”，所以就说“我开你一板儿砖”。")
+    assert continues_on_next_line("该书（2003年出版，", "共三卷）是一部小说。")
+    assert not continues_on_next_line("他说：“明天再来。", "第二天他果然来了”。")   # ends a sentence
+    assert not continues_on_next_line("为了叫起来顺嘴总不能叫“我开你一砖", "下一段和它没有关系。")  # nothing closes it
+    assert not continues_on_next_line("没有引号的一行", "头”，所以")                        # nothing is open
+    assert not continues_on_next_line("", "头”") and not continues_on_next_line("“砖", "")
+    assert join_lines("我开你一砖", "头”") == "我开你一砖头”"
+    assert join_lines("called (the Great", "Wall) today") == "called (the Great Wall) today"
+    assert join_lines("民国10年(19", "21年)毕业后回故里行医。") == "民国10年(1921年)毕业后回故里行医。"
+
+
+def test_paragraph_split_mid_sentence_is_joined():
+    # 板儿砖 (view/1066005): no summary field, and the article breaks a line inside a quotation
+    raw = _row("板儿砖", None, [("简介", "[英] bricks\n板儿砖以前并没有板儿砖，就叫砖头，所以称其为板儿砖。"
+                                       "究其发源地听说是北京新街口的爷们儿为了叫起来顺嘴总不能叫“我开你一砖\n"
+                                       "头”，所以就说“我开你一板儿砖”看起来多个字，其实还是挺顺嘴儿的。"),
+                              ("攻击力", "开始说攻击力，酒瓶，板儿砖，钢管儿。")])
+    rec = convert(raw, collections.Counter(), 300, False)
+    assert rec.summary.endswith("总不能叫“我开你一砖头”，所以就说“我开你一板儿砖”看起来多个字，其实还是挺顺嘴儿的。")
+    assert rec.quality_flags == ["summary_from_section", "summary_from_later_paragraph", "summary_joined_lines"]
+
+
+def test_complete_paragraphs_are_not_joined():
+    raw = _row("示例词条", None, [("简介", "示例词条是一个用来说明问题的词条，它的第一段是完整的。\n第二段也是完整的一句话，不应该被接上去。")])
+    stats = collections.Counter()
+    rec = convert(raw, stats, 300, False)
+    assert rec.summary == "示例词条是一个用来说明问题的词条，它的第一段是完整的。"
+    assert rec.quality_flags == ["summary_from_section"] and "flag:summary_joined_lines" not in stats
+    # a quote left open is not joined across sections, nor to a line that does not close it
+    raw = _row("示例词条", None, [("简介", "示例词条的第一段开了一个“引号却没有关上\n第二段和它没有关系，也没有引号。"),
+                                ("其他", "尾巴”在另一节里。")])
+    assert convert(raw, collections.Counter(), 300, False).summary == "示例词条的第一段开了一个“引号却没有关上"
+
+
+def test_short_fragments_are_not_joined_into_a_summary():
+    # 嚅 (shape of a real row): the stub lines must not become the summary by being glued together
+    raw = _row("嚅", None, [("基本字义", "(2) 〔嗫～〕见“\n(3) 嗫”。"),
+                           ("详细字义", "(1) 欲言【wish to speak】。如:嚅嗫(说话吞吞吐吐的样子);嚅忍(欲言而止)")])
+    rec = convert(raw, collections.Counter(), 300, False)
+    assert rec.summary.startswith("(1) 欲言")
+    assert "summary_joined_lines" not in rec.quality_flags

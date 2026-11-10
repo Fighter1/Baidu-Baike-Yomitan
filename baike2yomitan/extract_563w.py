@@ -9,7 +9,7 @@ import sys
 import time
 from typing import Iterator
 
-from .cleaning import (clean_text, first_paragraph, is_summary_candidate,
+from .cleaning import (clean_text, continues_on_next_line, first_paragraph, is_summary_candidate, join_lines,
                        short_summary_keep_reason, summary_drop_reason,
                        title_drop_reason, trim_summary)
 from .records import Record, RecordWriter, loads
@@ -21,30 +21,45 @@ _INFOBOX_TITLES = {"基本信息", "基本资料"}
 _KV_RE = re.compile(r"^\s*([^：:\s]{1,12})\s*[：:]\s*(.+?)\s*$")
 _PARA_SPLIT_RE = re.compile(r"\\n|\n|\r")
 MAX_FALLBACK_PARAGRAPHS = 40
+MAX_JOINED_LINES = 3  # lines added to a paragraph that a line break split mid-sentence
 
 
-def iter_paragraphs(sections: list) -> Iterator[str]:
-    """Cleaned, non-empty paragraphs of all sections in page order."""
+def iter_paragraphs(sections: list) -> Iterator[tuple[str, bool]]:
+    """Cleaned, non-empty paragraphs of all sections in page order, each with
+    whether it was put back together from lines broken in mid-sentence.
+
+    Only a line that could serve as a summary by itself is extended, so the
+    join never changes which paragraph is chosen. Joining short fragments as
+    well turned stubs such as (2) 〔嗫～〕见“ / (3) 嗫”。 into summaries."""
     for sec in sections or []:
-        for para in _PARA_SPLIT_RE.split(sec.get("content") or ""):
-            p = clean_text(para)
-            if p:
-                yield p
+        lines = [p for p in map(clean_text, _PARA_SPLIT_RE.split(sec.get("content") or "")) if p]
+        i = 0
+        while i < len(lines):
+            para, used = lines[i], 1
+            extend = is_summary_candidate(para)
+            while (extend and used <= MAX_JOINED_LINES and i + used < len(lines)
+                   and continues_on_next_line(para, lines[i + used])):
+                para = join_lines(para, lines[i + used])
+                used += 1
+            yield para, used > 1
+            i += used
 
 
-def find_fallback_summary(sections: list) -> tuple[str, bool] | None:
+def find_fallback_summary(sections: list) -> tuple[str, bool, bool] | None:
     """First paragraph of any section that can serve as a summary.
 
     Pages without a summary field usually open with an infobox section
     (基本信息 / 图书信息 / 重要参数) whose lines are 'key：value' pairs, or with a
     pinyin line; the real description sits a paragraph or a section later.
-    Returns (paragraph, is_first_paragraph) or None when nothing qualifies
-    within the first MAX_FALLBACK_PARAGRAPHS paragraphs."""
-    for i, p in enumerate(iter_paragraphs(sections)):
+    A qualifying paragraph that a line break split inside a quote or bracket
+    is joined to its continuation. Returns (paragraph, is_first_paragraph,
+    was_joined) or None when nothing qualifies within the first
+    MAX_FALLBACK_PARAGRAPHS paragraphs."""
+    for i, (p, joined) in enumerate(iter_paragraphs(sections)):
         if i >= MAX_FALLBACK_PARAGRAPHS:
             break
         if is_summary_candidate(p):
-            return p, i == 0
+            return p, i == 0, joined
     return None
 
 
@@ -125,10 +140,12 @@ def convert(raw: dict, stats: collections.Counter, max_summary_chars: int,
             summary = clean_text(first_paragraph(sections[0].get("content")))
             reason = summary_drop_reason(summary) or "summary_not_prose"
         else:
-            summary, is_first = found
+            summary, is_first, joined = found
             reason = None
             if not is_first:
                 flags.append("summary_from_later_paragraph")
+            if joined:
+                flags.append("summary_joined_lines")
     else:
         summary = clean_text(summary_src)
         reason = summary_drop_reason(summary)
@@ -141,6 +158,8 @@ def convert(raw: dict, stats: collections.Counter, max_summary_chars: int,
                 flags.append("summary_from_section")
                 if not found[1]:
                     flags.append("summary_from_later_paragraph")
+                if found[2]:
+                    flags.append("summary_joined_lines")
                 stats["flag:summary_from_section_after_short_summary"] += 1
     if reason:
         # Last resort: a complete short sentence or a 别称 infobox line is

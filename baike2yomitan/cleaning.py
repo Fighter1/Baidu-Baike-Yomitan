@@ -79,6 +79,30 @@ def first_paragraph(text: str | None) -> str:
     return ""
 
 
+# Quotes and brackets a line break can leave open in the middle of a sentence.
+_PAIRS = (("“", "”"), ("‘", "’"), ("（", "）"), ("(", ")"), ("《", "》"), ("「", "」"), ("『", "』"), ("【", "】"))
+_LINE_END = "。！？；…：:.!?;"
+
+
+def continues_on_next_line(line: str, next_line: str) -> bool:
+    """True when a line break fell inside a sentence: the line stops without
+    closing punctuation, inside a quote or bracket that the next line closes
+    (板儿砖: …总不能叫“我开你一砖 / 头”，所以就说…)."""
+    if not line or not next_line or line[-1] in _LINE_END:
+        return False
+    return any(next_line.count(close) > next_line.count(open_)
+               for open_, close in _PAIRS if line.count(open_) > line.count(close))
+
+
+def join_lines(line: str, next_line: str) -> str:
+    """Put the two halves of a broken line back together. The breaks fall
+    anywhere, also inside a number (民国10年(19 / 21年)), so only two ASCII
+    letters are kept apart with a space."""
+    a, b = line[-1], next_line[0]
+    sep = " " if a.isascii() and a.isalpha() and b.isascii() and b.isalpha() else ""
+    return line + sep + next_line
+
+
 def has_cjk(text: str) -> bool:
     return bool(_CJK_CHAR_RE.search(text))
 

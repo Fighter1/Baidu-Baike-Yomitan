@@ -155,6 +155,14 @@ paragraphs and sections (up to 40) for the first that qualifies; the record is
 flagged `summary_from_section` and, if it was not the first paragraph,
 `summary_from_later_paragraph`.
 
+Some articles break a line in the middle of a sentence (板儿砖: `…总不能叫“我开你一砖`
+on one line, `头”，所以就说…` on the next). When the chosen paragraph stops
+without closing punctuation inside a quote or bracket, and the next line of the
+same section closes it, that line is joined back on (up to three lines); the
+record is flagged `summary_joined_lines` (918 primary records). Lines that do
+not qualify as a summary by themselves are never joined, so the rule only
+extends a paragraph and does not change which one is chosen.
+
 Two kinds of summary under 15 characters are kept anyway, as a last resort
 when nothing longer exists on the page (both sources):
 
@@ -215,7 +223,9 @@ unambiguous; every other overlay sense is added as an extra record.
 
 `quality_flags` values: `summary_from_section` (primary had no usable summary
 field), `summary_from_later_paragraph` (that replacement was not the first
-paragraph of the page), `kept_short_sentence` / `kept_alias_line` (summary is
+paragraph of the page), `summary_joined_lines` (that paragraph was put back
+together from lines the article broke in mid-sentence),
+`kept_short_sentence` / `kept_alias_line` (summary is
 under 15 characters but was kept by the rules above), `abstract_fallback`
 (overlay content had no repeated abstract), `summary_refreshed` (merge replaced
 the summary with the overlay's), `no_lemma_id`.

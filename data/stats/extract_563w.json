@@ -13,6 +13,7 @@
  "flag:summary_from_later_paragraph": 1343535,
  "flag:summary_from_section": 2675004,
  "flag:summary_from_section_after_short_summary": 60128,
+ "flag:summary_joined_lines": 918,
  "input": "data\\raw\\563w\\563w_baidubaike.json",
  "input_rows": 5634898,
  "layout:jsonl": 1,

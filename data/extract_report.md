@@ -1,6 +1,6 @@
 # Extract report
 
-Generated 2026-11-08 12:29.
+Generated 2026-11-10 00:33.
 
 ## build_baike-full
 | metric | value |
@@ -8,10 +8,10 @@ Generated 2026-11-08 12:29.
 | entries | 8,817,011 |
 | entries_traditional | 3,928,236 |
 | records_seen | 4,888,775 |
-| seconds | 561 |
+| seconds | 497 |
 | term_banks | 882 |
 | titles_with_multiple_senses | 32,691 |
-| zip_bytes | 1,304,878,197 |
+| zip_bytes | 1,304,878,255 |
 
 ## build_baike-lexical
 | metric | value |
@@ -19,10 +19,10 @@ Generated 2026-11-08 12:29.
 | entries | 159,702 |
 | entries_traditional | 60,785 |
 | records_seen | 4,888,775 |
-| seconds | 47 |
+| seconds | 44 |
 | term_banks | 16 |
 | titles_with_multiple_senses | 32,691 |
-| zip_bytes | 25,112,328 |
+| zip_bytes | 25,112,386 |
 
 **Skipped at build**
 
@@ -30,6 +30,16 @@ Generated 2026-11-08 12:29.
 |---|---:|
 | excluded_tag | 3,832 |
 | not_in_cedict | 4,786,026 |
+
+## build_ci-smoke
+| metric | value |
+|---|---:|
+| entries | 1 |
+| records_seen | 1 |
+| seconds | 0 |
+| term_banks | 1 |
+| titles_with_multiple_senses | 0 |
+| zip_bytes | 1,083 |
 
 ## cedict
 | metric | value |
@@ -70,6 +80,7 @@ Generated 2026-11-08 12:29.
 | summary_from_later_paragraph | 1,343,535 |
 | summary_from_section | 2,675,004 |
 | summary_from_section_after_short_summary | 60,128 |
+| summary_joined_lines | 918 |
 
 ## extract_hf
 | metric | value |
@@ -176,6 +187,19 @@ from shards 0000 and 0004.
   (`最高车速(km/h)2180-100加速时间7.8`), lyric openings, or stats tables. One
   sampled page (经济法概论) carries the blurb of a different book — a source
   error, not detectable here.
+- **Lines broken in mid-sentence (2026-11-10):** section text sometimes has a
+  line break inside a sentence (板儿砖: `…总不能叫“我开你一砖` / `头”，所以就说…`),
+  so the fallback paragraph stopped in the middle of a quotation. A paragraph
+  that qualifies as a summary, stops without closing punctuation inside a
+  quote or bracket, and is closed by the next line of the same section now
+  gets that line joined on (up to three; flag `summary_joined_lines`, 918
+  records, 899 summaries changed and 19 trimmed back to the same text by the
+  length cap). No record was gained or lost. A first version also joined lines
+  too short to qualify by themselves; that turned dictionary stubs
+  (`(2) 〔嗫～〕见“` / `(3) 嗫”。`) and song lines into summaries and was dropped.
+  Not covered: breaks outside any quote or bracket, and lines whose
+  continuation does not close what was opened. 3,232 section-derived
+  summaries ended inside an open quote or bracket before the change.
 - Tags are present on only ~6 % of head rows but ~58 % of mid-file rows.
 - Summaries contain `[n]` citation markers, non-breaking and fullwidth spaces,
   and occasionally leaked image captions (`钟如标近照钟如标，男…`). Captions of
