@@ -11,7 +11,7 @@ Ready-made zips are attached to the
 | file | dictionary title | what it is |
 |---|---|---|
 | `baike-full.zip` | `百度百科 (full)` | every article that survived extraction: 4.9 M senses, 8.8 M entries with the traditional headwords, about 1.4 GB |
-| `baike-lexical.zip` | `百度百科 (lexical)` | only titles that are CC-CEDICT headwords, minus people, companies and schools: about 160 k entries, 26 MB |
+| `baike-lexical.zip` | `百度百科 (lexical)` | only titles that are CC-CEDICT headwords, minus people, companies and schools: about 167 k entries, 28 MB |
 
 Import either one in Yomitan → Settings → Dictionaries → *Import*. Both are
 self-updating: later releases arrive through *Check for updates*. Entries are
@@ -573,12 +573,22 @@ Validation now runs on every core of the runner. The first run to do so
 (2026-11-10) took 1 h 32 min: downloads 3 min, extraction and merge 19 min,
 both builds 12 min, validation 51 min (50 min of it the full zip) and the
 smoke test 3 min. Since then validation checks each distinct entry shape
-once and `all` ends with a quality audit; neither has been timed on a runner
-yet (on a 24-core machine they take about 3 min and 1 min for both zips).
+once and `all` ends with a quality audit. The first run with both
+(2026-11-10, release `v2026.11.10.6`) took 1 h 00 min: downloads 2 min,
+extraction and merge 27 min, both builds 17 min, validation 3½ min (3 min
+10 s of it the full zip), the smoke test and the audit together 7½ min, and
+publishing under 1 min. Extraction and the builds are slower than in the
+run before because of the rules added since; they use one core.
 The runner had 145 GB of disk, so the *Free disk space*
 step is a safety margin rather than a requirement; the 16.8 GB file cannot be
 cached between runs (10 GB cache limit), so every run downloads it again. All
-four runs completed without memory problems.
+five runs completed without memory problems.
+
+CC-CEDICT is not pinned: a build downloads the current MDBG export when it
+has none. The lexical dictionary and a few readings therefore differ slightly
+between a local build with an older copy and a release (121,612 headwords and
+167,014 lexical entries here, 121,633 and 167,052 in `v2026.11.10.6`; the
+full zips differed in two term banks out of 882).
 
 Both workflows that contact Hugging Face pass the repository secret `HF_TOKEN`
 to that step when it is set (*Settings → Secrets and variables → Actions*).
@@ -596,9 +606,9 @@ detects GitHub Actions. Pull requests opened by the upstream check come from
 the workflow token, so they do not trigger the tests workflow themselves; the
 tests run once the branch is pushed by a person or when the PR is merged.
 Opening that pull request needs the repository setting *Settings → Actions →
-General → Allow GitHub Actions to create and approve pull requests*; while it
-is off, the upstream check fails at that step the first time a dataset
-actually changes.
+General → Allow GitHub Actions to create and approve pull requests*, which is
+on for this repository since 2026-11-10. In a fork where it is off, the
+upstream check fails at that step the first time a dataset actually changes.
 
 ## Tests
 

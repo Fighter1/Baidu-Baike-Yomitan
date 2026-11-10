@@ -6,8 +6,8 @@ name: Build and release
 # took 2 h 02 min to 3 h 32 min on a standard runner, most of it single-process
 # schema validation; with validation on every core the fourth took 1 h 32 min.
 # Validation now checks each distinct entry shape once, and `all` ends with a
-# quality audit whose golden-word checks fail the build; neither has been
-# timed on a runner yet.
+# quality audit whose golden-word checks fail the build; the first run with
+# both took 1 h 00 min (validation 3.5 min, smoke test and audit 7.5 min).
 
 on:
   workflow_dispatch:
