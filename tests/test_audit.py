@@ -9,14 +9,16 @@ from baike2yomitan.cli import main
 from baike2yomitan.records import Record, RecordWriter
 
 
-def _rec(title, lid, summary, label="", default=None, tags=None):
+def _rec(title, lid, summary, label="", default=None, tags=None, infobox=None):
     return Record(source="563w", title=title, summary=summary, sense_label=label, lemma_id=lid,
-                  is_default_sense=default, tags=tags or [], url=f"https://baike.baidu.com/view/{lid}.htm")
+                  is_default_sense=default, tags=tags or [], url=f"https://baike.baidu.com/view/{lid}.htm",
+                  infobox=infobox)
 
 
 RECORDS = [
     _rec("时间", 1, "时间，读音shí jiān，汉语词语，指时间的单位。", label="汉语词汇"),
-    _rec("时间", 2, "《时间》是由韩三平监制《玫瑰行者》的插曲，宋祺作词、作曲，王晰演唱。"),
+    _rec("时间", 2, "《时间》是由韩三平监制《玫瑰行者》的插曲，宋祺作词、作曲，王晰演唱。",
+         infobox=[["歌曲名称", "时间"], ["演唱", "王晰"]]),
     _rec("时间", 3, "时间（Time）是物质的永恒运动、变化的持续性、顺序性的表现。", label="物理量"),
     _rec("北京", 4, "沃罗比约夫以北京冬奥会为主题的俄语歌曲《北京》。", label="俄语歌曲", default=True),   # a work on top
     _rec("北京", 5, "北京（Beijing），简称“京”，是中华人民共和国的首都、直辖市。", label="中华人民共和国首都"),
@@ -36,7 +38,7 @@ def zip_path(tmp_path, monkeypatch):
         for r in RECORDS:
             w.write(r)
     out = tmp_path / "baike-full.zip"
-    build(str(tmp_path / "r.jsonl"), str(out), pinyin=True, traditional="s2tw", pinyin_overrides=None)
+    build(str(tmp_path / "r.jsonl"), str(out), pinyin=True, traditional="s2tw", pinyin_overrides=None, infobox=True)
     return str(out)
 
 
@@ -58,10 +60,17 @@ def test_golden_checks(zip_path, tmp_path):
 没有这个词\tabsent
 保险单\tsenses_max\t2
 里面\tends\t相对。
+时间\ttable_lacks\t影片名称
+里面\ttable_lacks\t演唱
 只在小词典\tpresent\t\tlexical
 """)
     stats, failures = audit(zip_path, golden)
-    assert failures == [] and stats["golden_checks"] == 10 and stats["golden_failures"] == 0   # the lexical-only line is not checked
+    assert failures == [] and stats["golden_checks"] == 12 and stats["golden_failures"] == 0   # the lexical-only line is not checked
+
+
+def test_table_lacks_looks_at_every_sense(zip_path, tmp_path):
+    _, failures = audit(zip_path, _golden(tmp_path, "时间\ttable_lacks\t王晰\n"))     # the table of the second sense
+    assert len(failures) == 1 and "info table of" in failures[0] and "王晰" in failures[0]
 
 
 def test_golden_failures_say_what_was_found(zip_path, tmp_path):

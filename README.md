@@ -114,7 +114,7 @@ described in their own sections below.
 | `--skip-verify`, `--no-hash` | extract, all | skip the pinned-input check, or check sizes only |
 | `inputs pin\|verify\|download [--source 563w\|hf]` | inputs | maintain `data/source-inputs.json` (see *Downloading the corpora*) |
 | `--max-summary-chars N` | extract, all | trim summaries to N chars at the last `。！？；` inside the window (default 300); a hard cut adds `…` |
-| `--no-infobox` | extract, all | do not parse `基本信息`/`基本资料` sections into `[key, value]` pairs |
+| `--no-infobox` | extract, all | do not parse `基本信息`/`基本资料` sections into `[key, value]` pairs (they are parsed only at the top of the page, see *Record schema*) |
 | `--merge-key title\|lemma_id` | merge | how overlay records match primary ones; `title` is the default because the two sources' ids differ (see below) |
 | `--pinyin` | build, all | fill Yomitan's reading field (`hóng sè shí pǐn`) from CC-CEDICT, the article's own pinyin, then pypinyin (see *Readings*); off by default, the reading is then empty |
 | `--readings-cedict PATH\|none` | build, all | CC-CEDICT export to take readings from; default is the `--cedict` file, else `data/cedict/…` when present |
@@ -214,7 +214,7 @@ is part of the article's own title (语音编辑器) is not removed.
 Overlay links keep the characters that mean something in a URL encoded
 (`/item/C%23/195147`), so they still lead to the article.
 
-Outputs (figures from a local build of 2026-11-10 with the rules described here, `--pinyin --traditional s2tw --infobox`; release `2026.11.10.4` predates them):
+Outputs (figures from a local build of 2026-11-10 with the rules described here, `--pinyin --traditional s2tw --infobox`; release `2026.11.10.6` has them all except the info table rule under *Record schema*):
 
 - `data/records.jsonl` (4.67 M records), `data/records.hf.jsonl` (401 k), `data/records.merged.jsonl` (4.87 M) — one JSON record per sense
 - `data/extract_report.md` — drop counts by reason, quality flags, merge counts, heuristics notes
@@ -316,14 +316,31 @@ paragraph of the page), `summary_joined_lines` (that paragraph was put back
 together from lines the article broke in mid-sentence),
 `summary_from_definition_line` (the value of a `解释：`-style line),
 `kept_short_sentence` / `kept_alias_line` (summary is
-under 15 characters but was kept by the rules above), `abstract_fallback`
+under 15 characters but was kept by the rules above),
+`infobox_below_top_skipped` (the page has an info table further down than its
+second section, which was not taken), `abstract_fallback`
 (overlay content had no repeated abstract), `summary_refreshed` (merge replaced
 the summary with the overlay's; the flags about how the 2019 summary was found
 are removed), `no_lemma_id`.
 `is_default_sense` is `true` for the overlay sense that the id-less URL
 `/item/<title>` showed, `false` for the title's other senses, and `null` when
 no such snapshot exists (and on primary records that were not refreshed).
-`infobox` is an optional list of `[key, value]` pairs rendered by `build --infobox`.
+`infobox` is an optional list of `[key, value]` pairs rendered by `build --infobox`:
+the first six `key：value` lines of a `基本信息`/`基本资料` section, taken only
+when that section is the first of the page or the second. A row of the primary
+corpus can hold several articles of one title one after the other, or end with
+the sections of an unrelated page, and nothing in the row marks where one
+article stops. Release `2026.11.10.6` therefore showed 余华 the writer with the
+sex, birth date and height of a rower of the same name, whose article follows
+his in the row. In a sample, about six in ten of the tables found further down
+belonged to another article than the summary, so they are all dropped (11,008
+records, flag `infobox_below_top_skipped`; the full dictionary goes from
+485,480 senses with a table to 474,779). Some of those were the page's own
+table. Of such a table only a `拼音`/`读音` row that fits the title character
+by character is kept, because that reading is right whichever article the row
+stands in (307 senses now show the reading alone).
+Of the 3,555 tables that come second on a page with a summary field, about
+one in eight (some 470) is also another article's and is still shown.
 
 ### Validation
 
@@ -643,6 +660,7 @@ release got wrong, as `headword<TAB>check<TAB>value<TAB>scope`:
 | `ends VALUE` | the first sense's summary ends with VALUE |
 | `traditional VALUE` | the headword is also indexed under this spelling |
 | `senses_max N` | it has at most N senses |
+| `table_lacks VALUE` | no sense's info table mentions VALUE |
 
 `scope` is `full`, `lexical`, or empty for both. A check that does not hold is
 printed with what was found instead (`明朝  reading  míng cháo: readings

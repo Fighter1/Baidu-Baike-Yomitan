@@ -12,6 +12,7 @@ from typing import Iterator, NamedTuple
 from .cleaning import (MIN_SUMMARY_CHARS, clean_text, clean_title, continues_on_next_line, definition_value,
                        first_paragraph, has_tone_marks, is_summary_candidate, join_lines, pinyin_line_value,
                        says_nothing, short_summary_keep_reason, summary_drop_reason, title_drop_reason, trim_summary)
+from .readings import stated_pinyins
 from .records import Record, RecordWriter, loads
 from .sense import is_descriptor
 
@@ -127,20 +128,54 @@ def summary_hash(title: str, summary: str) -> int:
     return int.from_bytes(h.digest(), "big")
 
 
-def parse_infobox(sections: list) -> list | None:
-    """First six key：value pairs of a 基本信息/基本资料 section, if the section
-    body is made of such lines."""
-    for sec in sections or []:
+INFOBOX_MAX_POSITION = 1    # the first or the second section of the page
+
+
+def _infobox_pairs(sec: dict) -> list | None:
+    pairs = []
+    for line in re.split(r"\\n|\n", sec.get("content") or ""):
+        m = _KV_RE.match(line)
+        if m:
+            pairs.append([m.group(1), clean_text(m.group(2))])
+    return pairs[:6] if len(pairs) >= 2 else None
+
+
+def find_infobox(sections: list) -> tuple[list | None, bool]:
+    """(first six key：value pairs of the page's 基本信息/基本资料 section,
+    whether such a table was passed over for sitting further down the page).
+
+    The table is taken when its section opens the page or comes second, after
+    an introduction. A row of this corpus can hold several articles one after
+    the other: the 2019 page for 余华 is the writer's article followed by that
+    of a rower of the same name, and other rows end with the sections of an
+    unrelated page. Further down, the table belongs to another article than
+    the summary more often than not (张衡 with a film's table, 提拉米苏 with a
+    housing estate's), and nothing in the row says which.
+
+    Of a table that is passed over, the 拼音/读音 rows are returned: convert()
+    keeps those that read the title, see reads_title()."""
+    for i, sec in enumerate(sections or []):
         if (sec.get("title") or "").strip() in _INFOBOX_TITLES:
-            pairs = []
-            for line in re.split(r"\\n|\n", sec.get("content") or ""):
-                m = _KV_RE.match(line)
-                if m:
-                    pairs.append([m.group(1), clean_text(m.group(2))])
-            if len(pairs) >= 2:
-                return pairs[:6]
-            return None
-    return None
+            pairs = _infobox_pairs(sec)
+            if pairs is not None and i > INFOBOX_MAX_POSITION:
+                return [p for p in pairs if any(k in p[0] for k in _PINYIN_KEYS)] or None, True
+            return pairs, False
+    return None, False
+
+
+def parse_infobox(sections: list) -> list | None:
+    return find_infobox(sections)[0]
+
+
+def reads_title(title: str, row: list) -> bool:
+    """Whether an info table row states a pinyin that fits the title character
+    by character. Such a row is right whichever article of the page it stands
+    in (淇奥 qí yù, which the guess gets wrong as qí ào); the row of an
+    unrelated page does not fit (拼音名：Baihua Huoxue Dieda Gao under 日本财团)."""
+    try:
+        return bool(stated_pinyins({"title": title, "infobox": [row]}))
+    except ImportError:     # pypinyin is optional, and without it no stated reading is used anyway
+        return False
 
 
 def detect_layout(path: str) -> str:
@@ -247,7 +282,10 @@ def convert(raw: dict, stats: collections.Counter, max_summary_chars: int,
         flags.append("no_lemma_id")
     url = f"https://baike.baidu.com/view/{lemma_id}.htm" if lemma_id is not None else None
     tags = [t for t in (raw.get("tags") or []) if isinstance(t, str) and t.strip()]
-    infobox = parse_infobox(sections) if want_infobox else None
+    infobox, passed_over = find_infobox(sections) if want_infobox else (None, False)
+    if passed_over:
+        flags.append("infobox_below_top_skipped")
+        infobox = [row for row in infobox or [] if reads_title(title, row)] or None
     if (want_infobox and "summary_from_section" in flags and not has_tone_marks(summary)
             and not any(k in str(key) for key, _v in (infobox or []) for k in _PINYIN_KEYS)
             and (has_tone_marks(summary_src) or any(has_tone_marks(s.get("content")) for s in sections))):

@@ -8,9 +8,10 @@
  "drop:summary_too_short_fallback": 140489,
  "drop:title_empty": 9,
  "drop:title_too_long": 15957,
+ "flag:infobox_below_top_skipped": 11008,
  "flag:kept_alias_line": 556,
  "flag:kept_short_sentence": 16262,
- "flag:pinyin_line_kept": 73039,
+ "flag:pinyin_line_kept": 73070,
  "flag:sense_label_from_section": 40121,
  "flag:summary_from_definition_line": 16860,
  "flag:summary_from_later_paragraph": 1371206,
@@ -23,5 +24,5 @@
  "layout:jsonl": 1,
  "output": "data\\records.jsonl",
  "records_written": 4674224,
- "seconds": 743
+ "seconds": 965
 }

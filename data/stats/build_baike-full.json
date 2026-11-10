@@ -1,15 +1,15 @@
 {
  "entries": 8813748,
  "entries_traditional": 3940977,
- "reading:article": 86537,
+ "reading:article": 86541,
  "reading:article-shared": 1599,
  "reading:cedict": 106603,
  "reading:none": 148116,
  "reading:override": 1,
- "reading:pypinyin": 4529915,
+ "reading:pypinyin": 4529911,
  "records_seen": 4872771,
- "seconds": 765,
+ "seconds": 894,
  "term_banks": 882,
  "titles_with_multiple_senses": 46890,
- "zip_bytes": 1412303542
+ "zip_bytes": 1410737981
 }

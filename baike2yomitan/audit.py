@@ -26,8 +26,8 @@ from .validate import worker_count
 
 GOLDEN_PATH = os.path.join("data", "golden_words.tsv")
 CHECKS = ("present", "absent", "reading", "first_reading", "first", "first_not_work", "any", "ends", "traditional",
-          "senses_max")
-NEEDS_VALUE = {"reading", "first_reading", "first", "any", "ends", "traditional", "senses_max"}
+          "senses_max", "table_lacks")
+NEEDS_VALUE = {"reading", "first_reading", "first", "any", "ends", "traditional", "senses_max", "table_lacks"}
 SCOPES = ("", "full", "lexical")
 
 _LIST_ITEM_RE = re.compile(r"^\s*(?:[2-9]|[1-9]\d)\s*[、.．)）]|^\s*[（(](?:[2-9]|[1-9]\d)[)）]|^\s*[⑵-⒇②-⑳]")
@@ -87,11 +87,11 @@ def entry_parts(definitions) -> dict[str, str]:
 
 class Sense:
     """One article as the zip shows it: the rows that share a sequence number."""
-    __slots__ = ("title", "seq", "reading", "score", "label", "summary", "terms")
+    __slots__ = ("title", "seq", "reading", "score", "label", "summary", "terms", "table")
 
-    def __init__(self, title: str, seq: int, reading: str, score, label: str, summary: str, terms=()):
+    def __init__(self, title: str, seq: int, reading: str, score, label: str, summary: str, terms=(), table: str = ""):
         self.title, self.seq, self.reading, self.score = title, seq, reading, score
-        self.label, self.summary = label, summary
+        self.label, self.summary, self.table = label, summary, table
         self.terms = {title, *terms}
 
     def as_record(self) -> dict:
@@ -138,6 +138,9 @@ def _check(golden: dict, senses: list[Sense]) -> str | None:
         return None if value in got else f"other spellings {got}"
     if check == "senses_max":
         return None if len(senses) <= int(value) else f"{len(senses)} senses"
+    if check == "table_lacks":
+        bad = [s for s in senses if value in s.table]
+        return None if not bad else f"info table of {bad[0].label or bad[0].summary[:30]!r}: {bad[0].table[:80]!r}"
     raise ValueError(check)
 
 
@@ -206,7 +209,7 @@ def _read_bank(name: str) -> tuple[collections.Counter, list[tuple], list[tuple]
             stats["senses_without_a_reading"] += 1
         if title in keep:
             terms_now = []
-            kept.append((title, seq, reading, score, label, summary, terms_now))
+            kept.append((title, seq, reading, score, label, summary, terms_now, parts.get("infobox", "")))
         elif is_work({"title": title, "sense_label": label, "summary": summary}):
             stats["headwords_whose_first_sense_is_a_work"] += 1
     return stats, kept, orphans
@@ -253,8 +256,8 @@ def audit(zip_path: str, golden: list[dict] | None = None,
     for bank_stats, kept, bank_orphans in _run(_read_bank, names, workers, zip_path, frozenset(several | wanted)):
         stats.update(bank_stats)
         orphans.extend(bank_orphans)
-        for title, seq, reading, score, label, summary, terms in kept:
-            sense = senses[title, seq] = Sense(title, seq, reading, score, label, summary, terms)
+        for title, seq, reading, score, label, summary, terms, table in kept:
+            sense = senses[title, seq] = Sense(title, seq, reading, score, label, summary, terms, table)
             groups[title].append(sense)
     for title, seq, term in orphans:
         if (title, seq) in senses:

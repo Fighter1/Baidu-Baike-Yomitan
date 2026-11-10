@@ -15,5 +15,5 @@
  "input_rows": 587819,
  "output": "data\\records.hf.jsonl",
  "records_written": 401223,
- "seconds": 427
+ "seconds": 384
 }

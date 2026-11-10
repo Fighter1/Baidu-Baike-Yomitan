@@ -169,7 +169,8 @@ from shards 0000 and 0004.
    CJK punctuation, is removed; spaces around Latin words are kept.
 8. **Infobox**: only `基本信息`/`基本资料` sections whose body has ≥2 `key：value`
    lines; many such sections in this crawl are one long `k: v; k: v` line and
-   yield nothing.
+   yield nothing. Since 2026-11-10 only when the section is the first or the
+   second of the page (see the last section of this file).
 9. **Tag bank**: the only tag is `百科` (category `name`). Baike tags are shown
    as muted footer text (first five) and used only for `--exclude-tags`.
 10. **Traditional headwords** via OpenCC `s2t` by default (`s2twp` available);
@@ -287,3 +288,54 @@ a quote or bracket 8,149 and 129. The last two are not addressed.
 **Not fixed**: an ambiguous character later in a title (子丑寅卯 → 子醜寅卯);
 overlay records have no tags, so the lexical tag filter never sees them;
 summaries that start in the middle of a numbered list.
+
+## After release 2026.11.10.6: info tables of another article
+
+余华 the writer was shown with 性别 女, 出生日期 1981-01-19, 身高 175cm. The
+2019 row for that title has twelve sections: ten of the writer's article, then
+`基本信息` and `主要成绩` of a rower of the same name. The extractor took the
+first `基本信息` section anywhere on the page. 时间 (the physical quantity with
+a film's table) and 张衡 had the same fault.
+
+Where the 432,606 parseable info sections sit, and how often a random sample
+of 30 showed a table that does not belong to the summary:
+
+| position of the section | rows | wrong in sample |
+|---|---:|---:|
+| first | 394,831 | not sampled |
+| second, no summary field | 23,141 | 0 of 30 |
+| second, with summary field | 3,555 | 4 of 30 |
+| third or later, no summary field | 4,411 | 12 of 30 |
+| third or later, with summary field | 6,668 | 22 of 30 |
+
+Nothing in a row marks where one article ends, and a rule on the table's name
+row did not separate the cases (keys such as 英文名称 look like a different
+name). So the rule is positional: a table is taken from the first or second
+section only. 11,008 records carry the flag `infobox_below_top_skipped`.
+
+Effect on the full zip, against release 2026.11.10.6: 485,480 senses had a
+table, 474,779 have one; 10,701 tables are gone and none was added. Of 40
+dropped tables drawn at random, 26 belonged to another article (a housing
+estate under a textbook, a mini-game under a village, a film under a word).
+The 14 others were the page's own table (book data under a book), which is the
+price of the rule.
+
+A dropped table keeps a `拼音`/`读音` row that fits the title character by
+character (307 senses now show only that row). Without it five readings became
+worse in a first build (黄裳 huáng shang for huáng cháng, 淇奥 qí ào for
+qí yù). Keeping every such row was wrong as well: 日本财团 then showed
+拼音名 Baihua Huoxue Dieda Gao, from a medicine's page at the end of its row.
+`reading:article` is 86,541 (was 86,537) and `pinyin_line_kept` 73,070 (was
+73,039), because a page's own pinyin line now takes the place of a dropped
+row. Three readings differ from the release: 一咕噜 is yī gū lū, from the
+page's pinyin line, where it was yī gū lu; 玳瑁猫 and 英国玳瑁猫 (dài mài)
+come from the CC-CEDICT export on this machine, which has that entry wrong,
+while the release was built with a newer export.
+
+**Not fixed**: about 470 tables in second place under a summary field that
+belong to another article (4 of 30 in the sample); the tags of such a row are
+mixed in the same way.
+
+Golden words: 余华 `table_lacks` 1981-01-19 and 175cm, 时间 `table_lacks`
+影片名称, 张衡 `table_lacks` 片名. 44 of 44 checks hold on the full zip, 35 of 35
+on the lexical one; the audit rates are unchanged.

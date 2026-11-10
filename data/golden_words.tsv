@@ -13,6 +13,7 @@
 #     ends VALUE              the first sense's summary ends with VALUE
 #     traditional VALUE       the headword is also indexed under this spelling
 #     senses_max N            it has at most N senses
+#     table_lacks VALUE       no sense's info table mentions VALUE
 
 # -- A work named after the word must not be shown first (2026.11.10.4: 时间 opened with a film song)
 时间	first_not_work
@@ -69,3 +70,9 @@
 # -- Summaries that were cut or empty
 板儿砖	ends	挺顺嘴儿的。	full
 鱼游濠上	first	纵情山水	full
+
+# -- The info table must belong to the article of the summary (2026.11.10.6: 余华 the writer with a rower's table)
+余华	table_lacks	1981-01-19	full
+余华	table_lacks	175cm	full
+时间	table_lacks	影片名称
+张衡	table_lacks	片名	full

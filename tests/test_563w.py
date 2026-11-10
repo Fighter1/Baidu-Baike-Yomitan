@@ -3,7 +3,7 @@ import json
 import os
 
 from baike2yomitan.extract_563w import (convert, detect_layout, extract, iter_raw,
-                                        lemma_id_from_url, parse_infobox)
+                                        lemma_id_from_url, find_infobox, parse_infobox)
 from baike2yomitan.records import iter_records
 from baike2yomitan.sense import is_descriptor
 
@@ -89,6 +89,47 @@ def test_infobox_pairs(rows_563w_by_title):
     sections = [{"title": "基本信息", "content": "中文名：示例\\n外文名：Example\\n类型：测试\\n作者：甲\\n出版社：乙\\n页数：10\\n定价：1"}]
     box = parse_infobox(sections)
     assert box == [["中文名", "示例"], ["外文名", "Example"], ["类型", "测试"], ["作者", "甲"], ["出版社", "乙"], ["页数", "10"]]
+
+
+def _yu_hua(n_before):
+    """The writer's article, then the info section of a rower of the same name."""
+    writer = [{"title": t, "content": "余华的成名作是短篇小说《十八岁出门远行》，此后接连发表了多篇实验性极强的作品。"}
+              for t in ("简介", "创作", "特点", "作品")[:n_before]]
+    rower = [{"title": "基本信息", "content": "姓名：余华\n性别： 女 \n出生日期：1981-01-19\n出生地：北京\n身高：175cm"},
+             {"title": "主要成绩", "content": "2006年世界赛艇锦标赛女子轻量级四人双桨冠军。"}]
+    return {"title": "余华", "summary": "余华，当代作家，浙江海盐县人，祖籍山东高唐县。著有长篇小说《活着》《许三观卖血记》。",
+            "tags": [], "url": "http://baike.baidu.com/view/3837.htm", "sections": writer + rower}
+
+
+def test_info_table_is_only_taken_from_the_top_of_the_page():
+    # after four sections of another article the table is someone else's
+    stats = collections.Counter()
+    rec = convert(_yu_hua(4), stats, 300, want_infobox=True)
+    assert rec.infobox is None and rec.summary.startswith("余华，当代作家")
+    assert "infobox_below_top_skipped" in rec.quality_flags and stats["flag:infobox_below_top_skipped"] == 1
+    assert find_infobox(_yu_hua(2)["sections"]) == (None, True)
+    # first section, or second after an introduction: the page's own table
+    for n in (0, 1):
+        stats = collections.Counter()
+        rec = convert(_yu_hua(n), stats, 300, want_infobox=True)
+        assert rec.infobox[:2] == [["姓名", "余华"], ["性别", "女"]] and "infobox_below_top_skipped" not in rec.quality_flags
+    # a section further down that is not a table is not counted as one passed over
+    prose = {"title": "基本信息", "content": "余华的小说以冷峻的笔调著称。"}
+    assert find_infobox([{"title": "简介", "content": "甲"}, {"title": "创作", "content": "乙"}, prose]) == (None, False)
+    # of a table that is passed over, a row with the title's reading stays: it is right for every article of the page
+    raw = _yu_hua(4)
+    raw["sections"][4]["content"] += "\n拼音：yú huá"
+    assert find_infobox(raw["sections"]) == ([["拼音", "yú huá"]], True)
+    rec = convert(raw, collections.Counter(), 300, want_infobox=True)
+    assert rec.infobox == [["拼音", "yú huá"]] and "infobox_below_top_skipped" in rec.quality_flags
+    # the reading of some other title is the unrelated page's and goes with the rest
+    raw = _yu_hua(4)
+    raw["sections"][4]["content"] += "\n拼音名：Baihua Huoxue Dieda Gao"
+    assert find_infobox(raw["sections"]) == ([["拼音名", "Baihua Huoxue Dieda Gao"]], True)
+    rec = convert(raw, collections.Counter(), 300, want_infobox=True)
+    assert rec.infobox is None and "infobox_below_top_skipped" in rec.quality_flags
+    # nothing is flagged when info tables are not wanted
+    assert "infobox_below_top_skipped" not in convert(_yu_hua(4), collections.Counter(), 300, want_infobox=False).quality_flags
 
 
 def test_short_summary_rescued_from_first_section():

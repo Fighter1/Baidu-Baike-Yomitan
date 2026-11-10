@@ -4,10 +4,10 @@
  "kept:excluded_tag_on_ordinary_word": 1662,
  "reading:cedict": 104436,
  "records_seen": 4872771,
- "seconds": 105,
+ "seconds": 125,
  "skip:excluded_tag": 2167,
  "skip:not_in_cedict": 4766168,
  "term_banks": 17,
  "titles_with_multiple_senses": 46890,
- "zip_bytes": 28284161
+ "zip_bytes": 27982195
 }
