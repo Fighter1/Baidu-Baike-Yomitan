@@ -175,12 +175,12 @@ UI labels 播报/编辑/语音 and the overlay's `zhua曲子白渡白颗` traile
 whitespace (incl. fullwidth and no-break spaces) is normalised and single spaces
 between Chinese characters are dropped.
 
-Outputs (figures from the 2026-11-09 release build, `--pinyin --traditional s2t --infobox`):
+Outputs (figures from the 2026-11-10 release build, `--pinyin --traditional s2tw --infobox`):
 
 - `data/records.jsonl` (4.72 M records), `data/records.hf.jsonl` (383 k), `data/records.merged.jsonl` (4.89 M) — one JSON record per sense
 - `data/extract_report.md` — drop counts by reason, quality flags, merge counts, heuristics notes
 - `data/short_summary_examples.md` — sampled analysis of the under-15-character drops that motivated the paragraph-walking fallback
-- `dist/baike-full.zip` — everything that survived extraction: 8.8 M entries (incl. 3.9 M traditional headwords), 882 term banks, ~1.4 GB
+- `dist/baike-full.zip` — everything that survived extraction: 8.8 M entries (incl. 3.9 M traditional headwords), 881 term banks, ~1.4 GB
 - `dist/baike-lexical.zip` — only titles that are simplified CC-CEDICT headwords (103 k records), minus `--exclude-tags 人物,企业,学校`: 160 k entries, 26 MB
 - `dist/<name>.index.json` — a copy of each zip's `index.json`, written when `--update-url` is given (see *Self-updating dictionaries*)
 - `data/stats/*.json` — the counters behind the report and the release notes
@@ -279,7 +279,10 @@ only matches the spelling that is stored:
 
 `s2t` keeps 着 for zháo/zhuó/zhe and writes 裏 and 爲, which Taiwanese text
 does not use; `s2twp` rewrites words as well, so its headwords stop matching
-the article titles. Releases up to `2026.11.09.3` were built with `s2t`.
+the article titles. `s2t` also writes 牀, 峯 and 羣 where `s2tw` keeps 床, 峰
+and 群, so `s2tw` gives slightly fewer titles a separate traditional headword
+(8,809,667 entries in the full zip against 8,817,011). Releases up to
+`2026.11.09.3` were built with `s2t`.
 
 ### Readings
 
@@ -389,11 +392,13 @@ The full build needs roughly 27 GB of disk (16.8 GB primary, 2.2 GB overlay,
 2 h 02 min, 2 h 29 min and 3 h 32 min on a standard GitHub-hosted runner.
 Schema validation of the full zip, then in a single process, was most of
 that: 1 h 20 min, 1 h 46 min and 2 h 30 min. The downloads took 2 to 14 min.
-Validation now runs on every core of the runner; that has not been timed
-there yet. The runner had 145 GB of disk, so the *Free disk space* step is
-a safety margin rather than a requirement; the 16.8 GB file cannot be cached
-between runs (10 GB cache limit), so every run downloads it again. All three
-runs completed without memory problems.
+Validation now runs on every core of the runner. The first run to do so
+(2026-11-10) took 1 h 32 min: downloads 3 min, extraction and merge 19 min,
+both builds 12 min, validation 51 min (50 min of it the full zip) and the
+smoke test 3 min. The runner had 145 GB of disk, so the *Free disk space*
+step is a safety margin rather than a requirement; the 16.8 GB file cannot be
+cached between runs (10 GB cache limit), so every run downloads it again. All
+four runs completed without memory problems.
 
 To publish a new release, run the workflow from the Actions tab or with
 `gh workflow run build-release.yml`. Nothing rebuilds automatically: not a
