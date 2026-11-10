@@ -420,6 +420,12 @@ step is a safety margin rather than a requirement; the 16.8 GB file cannot be
 cached between runs (10 GB cache limit), so every run downloads it again. All
 four runs completed without memory problems.
 
+Both workflows that contact Hugging Face pass the repository secret `HF_TOKEN`
+to that step when it is set (*Settings → Secrets and variables → Actions*).
+The datasets are public, so the secret is optional: it only replaces the
+anonymous rate limit with the higher one for signed-in accounts. A read-only
+token is enough.
+
 To publish a new release, run the workflow from the Actions tab or with
 `gh workflow run build-release.yml`. Nothing rebuilds automatically: not a
 push to `main`, and not a merged upstream-inputs pull request.

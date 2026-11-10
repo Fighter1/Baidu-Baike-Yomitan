@@ -68,6 +68,10 @@ jobs:
           echo "revision $rev"
 
       - name: Download the pinned inputs (verifies size and SHA-256)
+        # Optional secret: authenticated requests get higher rate limits. The
+        # datasets are public, so the step also works when the secret is not set.
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           python -m baike2yomitan inputs download
           df -h / | tail -1

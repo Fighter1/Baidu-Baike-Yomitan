@@ -35,6 +35,7 @@ jobs:
       - name: Re-pin inputs against Hugging Face
         env:
           PYTHONUTF8: "1"
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}  # optional; raises the API rate limit
         run: python -m baike2yomitan inputs pin
 
       - name: Detect changes (ignoring the generated-date line)
