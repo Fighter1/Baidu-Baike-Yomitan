@@ -88,12 +88,12 @@ Do not use `datasets.load_dataset` on the primary file: it would build a second
 python -X utf8 -m baike2yomitan extract --source 563w [--limit N] [--max-summary-chars 300]
 python -X utf8 -m baike2yomitan extract --source hf   [--limit N]
 python -X utf8 -m baike2yomitan merge                 # records.jsonl + records.hf.jsonl → records.merged.jsonl (keyed on title)
-python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-full.zip [--pinyin] [--traditional s2t|s2twp] [--infobox]
+python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-full.zip [--pinyin] [--traditional s2tw|s2t|s2twp|s2hk] [--infobox]
 python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-lexical.zip --cedict data/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz --exclude-tags 人物,企业,学校
 python -X utf8 -m baike2yomitan validate dist/baike-full.zip
 python -X utf8 -m baike2yomitan smoke dist/baike-full.zip
 python -X utf8 -m baike2yomitan sample --records data/records.merged.jsonl -n 20
-python -X utf8 -m baike2yomitan all --overlay-hf --pinyin --traditional s2t --infobox --exclude-tags 人物,企业,学校 --update-url github
+python -X utf8 -m baike2yomitan all --overlay-hf --pinyin --traditional s2tw --infobox --exclude-tags 人物,企业,学校 --update-url github
 python -X utf8 -m baike2yomitan release --dry-run        # upload dist zips as a GitHub release (see below)
 ```
 
@@ -115,7 +115,7 @@ iteration. `inputs` and `release` are described in their own sections below.
 | `--merge-key title\|lemma_id` | merge | how overlay records match primary ones; `title` is the default because the two sources' ids differ (see below) |
 | `--pinyin` | build, all | fill Yomitan's reading field (`hóng sè shí pǐn`) from CC-CEDICT, the article's own pinyin, then pypinyin (see *Readings*); off by default, the reading is then empty |
 | `--readings-cedict PATH\|none` | build, all | CC-CEDICT export to take readings from; default is the `--cedict` file, else `data/cedict/…` when present |
-| `--traditional s2t\|s2twp\|s2hk` | build, all | also emit a traditional-script headword for every entry whose OpenCC conversion differs from the simplified title; same content and sequence number |
+| `--traditional s2tw\|s2t\|s2twp\|s2hk` | build, all | also emit a traditional-script headword for every entry whose OpenCC conversion differs from the simplified title; same content and sequence number. The modes differ in character forms, see *Showing simplified and traditional together* |
 | `--infobox` | build, all | render the extracted infobox pairs (first six) as a two-column table under the summary |
 | `--cedict PATH` | build, all | `build`: keep only records whose title is a simplified CC-CEDICT headword (the lexical build). `all`: where the MDBG export lives (default `data/cedict/…`, downloaded when missing); it always builds both zips |
 | `--exclude-tags a,b` | build, all | drop records carrying any of these Baike tags; `all` applies it to the lexical build only |
@@ -123,7 +123,8 @@ iteration. `inputs` and `release` are described in their own sections below.
 | `--revision R` | build, all | `index.json` revision; dot-separated integers only (default: today plus `.1`, e.g. `2026.11.09.1`) |
 | `--update-url BASE\|github` | build, all | make the zip self-updating: `index.json` gets `isUpdatable` + `indexUrl`/`downloadUrl` under `BASE`; `github` derives `https://github.com/<owner>/<repo>/releases/latest/download` from the `origin` remote |
 | `--repo`, `--tag`, `--title`, `--notes-file`, `--draft`, `--dry-run` | release | see *Self-updating dictionaries* below |
-| `--no-validate` | build, all | skip the schema check after building (~45 min for the full zip) |
+| `--no-validate` | build, all | skip the schema check after building (the slowest step for the full zip) |
+| `--validate-workers N` | build, validate, all | processes for the schema check (default: every core) |
 | `--engine auto\|fast\|jsonschema` | validate | fastjsonschema when installed (default), or the reference implementation |
 | `--schemas-dir`, `--seed` | build, validate, smoke, sample | where the Yomitan schemas are cached; seed for the random smoke/sample picks |
 | `--random N` | smoke | how many random headwords to look up besides the fixed ones |
@@ -189,7 +190,10 @@ Each zip holds `index.json`, `styles.css` and `term_bank_N.json` files of
 
 Wall-clock on this machine: primary extract ~8.5 min, overlay extract ~6 min,
 merge ~2 min, full build ~4 min (~10.5 min with `--pinyin`), lexical build
-~1 min, full-zip validation ~45 min (fastjsonschema).
+~1 min. Full-zip validation (fastjsonschema, 882 term banks) took 13 min with
+the default of one process per core (24 here) and 33 min with
+`--validate-workers 4`; a single process needs about an hour and a half
+(estimated from a 32-bank sample). Only validation uses more than one core.
 
 ### Merge semantics
 
@@ -217,7 +221,10 @@ under 15 characters but was kept by the rules above), `abstract_fallback`
 the summary with the overlay's), `no_lemma_id`.
 Validation uses `fastjsonschema` when installed (the reference `jsonschema`
 package takes hours on ~7 M entries); `validate --engine jsonschema` forces the
-reference implementation.
+reference implementation. Even so the check costs about 6 s of CPU per
+10,000-entry term bank, nearly all of it in the structured-content schema, so
+the zip's files are spread over one process per core (`--validate-workers N`
+to change that). Progress lines and errors keep the zip's order.
 `infobox` is an optional list of `[key, value]` pairs rendered by `build --infobox`.
 
 ## Importing into Yomitan
@@ -259,6 +266,20 @@ opens with both spellings in small boxes, traditional (red) then simplified
 boxes are styled by a `styles.css` inside the zip, which Yomitan applies only
 to this dictionary's entries; a title that OpenCC leaves unchanged gets a
 single simplified box.
+
+The OpenCC mode decides which traditional spelling is stored, and a lookup
+only matches the spelling that is stored:
+
+| mode | 不着四六 | 里面 | 为什么 | 软件 |
+|---|---|---|---|---|
+| `s2tw` (Taiwan character forms; used for releases) | 不著四六 | 裡面 | 為什麼 | 軟件 |
+| `s2t` (OpenCC standard) | 不着四六 | 裏面 | 爲什麼 | 軟件 |
+| `s2twp` (Taiwan characters and vocabulary) | 不著四六 | 裡面 | 為什麼 | 軟體 |
+| `s2hk` (Hong Kong) | 不着四六 | 裏面 | 為什麼 | 軟件 |
+
+`s2t` keeps 着 for zháo/zhuó/zhe and writes 裏 and 爲, which Taiwanese text
+does not use; `s2twp` rewrites words as well, so its headwords stop matching
+the article titles. Releases up to `2026.11.09.3` were built with `s2t`.
 
 ### Readings
 
@@ -314,7 +335,7 @@ GitHub's `…/releases/latest/download/<asset>` URL always points at the newest
 non-draft release, so it is a stable target for both fields. The flow:
 
 ```bash
-python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-full.zip --pinyin --traditional s2t --infobox --update-url github
+python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-full.zip --pinyin --traditional s2tw --infobox --update-url github
 ```
 
 ```bash
@@ -364,13 +385,15 @@ Three workflows under `.github/workflows/`:
 | `build-release.yml` | manual only (*Actions → Build and release → Run workflow*) | frees runner disk, downloads the pinned corpora, runs `all` with `--update-url github` and revision `UTC-date.run-number`, uploads the reports as an artifact and publishes the release as *latest*. Inputs: `publish` (off keeps the zips as a 7-day artifact instead), `skip_validation`, `revision` |
 
 The full build needs roughly 27 GB of disk (16.8 GB primary, 2.2 GB overlay,
-6.6 GB of record files, 1.4 GB zip) and two to two and a half hours on a
-standard GitHub-hosted runner (the two runs of 2026-11-09 took 2 h 02 min and
-2 h 29 min: 3 min download, the rest `all`, of which ~45 min is the schema
-validation). The runner had 145 GB of disk, so the *Free disk space* step is
+6.6 GB of record files, 1.4 GB zip). The three runs of 2026-11-09 took
+2 h 02 min, 2 h 29 min and 3 h 32 min on a standard GitHub-hosted runner.
+Schema validation of the full zip, then in a single process, was most of
+that: 1 h 20 min, 1 h 46 min and 2 h 30 min. The downloads took 2 to 14 min.
+Validation now runs on every core of the runner; that has not been timed
+there yet. The runner had 145 GB of disk, so the *Free disk space* step is
 a safety margin rather than a requirement; the 16.8 GB file cannot be cached
-between runs (10 GB cache limit), so every run downloads it again. Both runs
-completed without memory problems.
+between runs (10 GB cache limit), so every run downloads it again. All three
+runs completed without memory problems.
 
 To publish a new release, run the workflow from the Actions tab or with
 `gh workflow run build-release.yml`. Nothing rebuilds automatically: not a

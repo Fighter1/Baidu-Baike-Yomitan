@@ -125,14 +125,16 @@ def cmd_build(a) -> int:
     exclude = set(t for t in (a.exclude_tags or "").split(",") if t)
     _build_one(a.records, a.out, a, cedict_words, exclude, _readings_cedict(a, fallback=a.cedict))
     if not a.no_validate:
-        return cmd_validate(argparse.Namespace(zip=a.out, schemas_dir=a.schemas_dir, engine="auto"))
+        return cmd_validate(argparse.Namespace(zip=a.out, schemas_dir=a.schemas_dir, engine="auto",
+                                               validate_workers=a.validate_workers))
     return 0
 
 
 def cmd_validate(a) -> int:
     from .validate import validate_zip
 
-    errors = validate_zip(a.zip, a.schemas_dir, engine=getattr(a, "engine", "auto"))
+    errors = validate_zip(a.zip, a.schemas_dir, engine=getattr(a, "engine", "auto"),
+                          workers=getattr(a, "validate_workers", None))
     if errors:
         print(f"VALIDATION FAILED for {a.zip}: {len(errors)} error(s)")
         for e in errors:
@@ -240,7 +242,8 @@ def cmd_all(a) -> int:
         if getattr(a, "no_validate", False):
             print(f"validation skipped for {z} (--no-validate)")
         else:
-            rc |= cmd_validate(argparse.Namespace(zip=z, schemas_dir=a.schemas_dir, engine="auto"))
+            rc |= cmd_validate(argparse.Namespace(zip=z, schemas_dir=a.schemas_dir, engine="auto",
+                                                  validate_workers=a.validate_workers))
     inter = lex["records_seen"] - lex.get("skip:not_in_cedict", 0)
     save_stats("cedict", {"cedict_headwords": len(words), "records_with_cedict_title": inter,
                           "lexical_entries_after_tag_exclusion": lex["entries"]})
@@ -271,11 +274,15 @@ def main(argv=None) -> int:
         sp.add_argument("--readings-cedict", default=None, metavar="PATH|none",
                         help="CC-CEDICT export to take readings from (default: the --cedict file, else "
                              "data/cedict/… when present); 'none' disables it")
-        sp.add_argument("--traditional", choices=["s2t", "s2twp", "s2hk"], default=None,
-                        help="also emit traditional-script headwords via OpenCC")
+        sp.add_argument("--traditional", choices=["s2t", "s2tw", "s2twp", "s2hk"], default=None,
+                        help="also emit traditional-script headwords via OpenCC: s2tw gives Taiwan "
+                             "character forms (著, 裡, 為), s2t keeps 着, 裏, 爲, s2twp also rewrites "
+                             "vocabulary, s2hk gives Hong Kong forms")
         sp.add_argument("--infobox", action="store_true", help="render 基本信息 pairs below the summary")
         sp.add_argument("--exclude-tags", default="", help="comma-separated Baike tags to drop (lexical build)")
         sp.add_argument("--schemas-dir", default=os.path.join("data", "schemas"))
+        sp.add_argument("--validate-workers", type=int, default=None, metavar="N",
+                        help="processes for the schema check (default: every core)")
         sp.add_argument("--seed", type=int, default=None)
         sp.add_argument("--revision", default=None,
                         help="index.json revision, dot-separated integers (default: today as Y.M.D)")
@@ -313,6 +320,8 @@ def main(argv=None) -> int:
     sp.add_argument("--schemas-dir", default=os.path.join("data", "schemas"))
     sp.add_argument("--engine", choices=["auto", "fast", "jsonschema"], default="auto",
                     help="fastjsonschema (default when installed) or the reference jsonschema package")
+    sp.add_argument("--validate-workers", type=int, default=None, metavar="N",
+                    help="processes for the schema check (default: every core)")
     sp.set_defaults(fn=cmd_validate)
 
     sp = sub.add_parser("smoke", help="look up known titles in a zip")
@@ -348,7 +357,7 @@ def main(argv=None) -> int:
     sp = sub.add_parser("all", help="extract (+overlay, merge), build both zips, validate, smoke")
     sp.add_argument("--overlay-hf", action="store_true")
     sp.add_argument("--cedict", default=None)
-    sp.add_argument("--no-validate", action="store_true", help="skip the schema check of both zips (~45 min)")
+    sp.add_argument("--no-validate", action="store_true", help="skip the schema check of both zips (the slowest step)")
     add_common_extract(sp)
     add_common_build(sp)
     sp.set_defaults(fn=cmd_all)

@@ -2,8 +2,9 @@ name: Build and release
 
 # Manual: download the pinned corpora (16.8 GB + 2.2 GB), run the whole
 # pipeline and publish both zips as the latest GitHub release so Yomitan's
-# "Check for updates" picks them up. Needs ~27 GB of disk and about two hours
-# on a standard runner (first run: 2 h 02 min, ~45 min of it schema validation).
+# "Check for updates" picks them up. Needs ~27 GB of disk. The first three runs
+# took 2 h 02 min to 3 h 32 min on a standard runner, most of it single-process
+# schema validation; validation now uses every core.
 
 on:
   workflow_dispatch:
@@ -13,7 +14,7 @@ on:
         type: boolean
         default: true
       skip_validation:
-        description: "Skip the ~45 min schema validation of both zips"
+        description: "Skip the schema validation of both zips (the slowest step)"
         type: boolean
         default: false
       revision:
@@ -73,7 +74,7 @@ jobs:
 
       - name: Extract, merge, build, validate, smoke
         run: |
-          python -m baike2yomitan all --overlay-hf --pinyin --traditional s2t --infobox \
+          python -m baike2yomitan all --overlay-hf --pinyin --traditional s2tw --infobox \
             --exclude-tags 人物,企业,学校 --update-url github --revision "$REVISION" --no-hash \
             ${{ inputs.skip_validation && '--no-validate' || '' }} | tee data/all.log
           df -h / | tail -1

@@ -8,6 +8,7 @@ import re
 import sys
 import urllib.request
 import zipfile
+from concurrent.futures import ProcessPoolExecutor
 
 SCHEMA_FILES = {
     "index": "dictionary-index-schema.json",
@@ -73,43 +74,107 @@ def _make_validators(schemas: dict[str, dict], engine: str) -> dict:
     return {k: mk(v) for k, v in schemas.items()}
 
 
+def _member_kind(name: str) -> str | None:
+    """The schema a zip member is checked against: "" when it has none, None when it does not belong."""
+    if name == "index.json":
+        return "index"
+    if re.fullmatch(r"term_bank_\d+\.json", name):
+        return "term"
+    if re.fullmatch(r"tag_bank_\d+\.json", name):
+        return "tag"
+    if name == "styles.css":  # dictionary-scoped CSS, no schema
+        return ""
+    return None
+
+
+MAX_WORKERS_WINDOWS = 61  # ProcessPoolExecutor raises above this on Windows
+
+
+def default_workers() -> int:
+    """Cores this process may use."""
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:  # Windows and macOS have no affinity call
+        return os.cpu_count() or 1
+
+
+def worker_count(requested: int | None, tasks: int, platform: str = sys.platform) -> int:
+    """Processes to start: the request (default: every core), never more than there are
+    files to check or than the platform's process pool accepts."""
+    n = min(requested or default_workers(), tasks)
+    if platform == "win32":
+        n = min(n, MAX_WORKERS_WINDOWS)
+    return max(1, n)
+
+
+_worker: dict = {}  # per-process state: the open zip and the compiled schemas
+
+
+def _init_worker(zip_path: str, schema_dir: str, engine: str) -> None:
+    _worker["zip"] = zipfile.ZipFile(zip_path)
+    _worker["validators"] = _make_validators(load_schemas(schema_dir), engine)
+
+
+def _check_member(task: tuple[str, str]) -> tuple[str, str, list[str]]:
+    """Check one zip member; returns (name, entry count or 'index', error messages)."""
+    name, kind = task
+    data = json.loads(_worker["zip"].read(name))
+    errors = []
+    if kind == "term" and len(data) > 10_000:
+        errors.append(f"{len(data)} entries (> 10000)")
+    errors.extend(_worker["validators"][kind](data))
+    return name, str(len(data)) if isinstance(data, list) else "index", errors
+
+
 def validate_zip(zip_path: str, schema_dir: str = DEFAULT_SCHEMA_DIR, max_errors: int = 20,
-                 engine: str = "auto") -> list[str]:
-    """Return a list of error strings (empty = valid)."""
-    schemas = load_schemas(schema_dir)
-    validators = _make_validators(schemas, engine)
+                 engine: str = "auto", workers: int | None = None) -> list[str]:
+    """Return a list of error strings (empty = valid).
+
+    The schema check is CPU-bound (~6 s per 10,000-entry term bank) and the
+    zip members are independent, so they are spread over `workers` processes
+    (default: every core). Progress lines and errors keep the zip's order."""
+    load_schemas(schema_dir)  # download them once, before any worker looks
     errors: list[str] = []
     with zipfile.ZipFile(zip_path) as zf:
         names = zf.namelist()
-        if any("/" in n for n in names):
-            errors.append("zip contains subfolders: " + ", ".join(n for n in names if "/" in n)[:200])
-        if "index.json" not in names:
-            errors.append("index.json missing")
-        term_banks = sorted(n for n in names if re.fullmatch(r"term_bank_\d+\.json", n))
-        if not term_banks:
-            errors.append("no term_bank_N.json files")
-        for name in names:
-            if name == "index.json":
-                kind = "index"
-            elif re.fullmatch(r"term_bank_\d+\.json", name):
-                kind = "term"
-            elif re.fullmatch(r"tag_bank_\d+\.json", name):
-                kind = "tag"
-            elif name == "styles.css":  # dictionary-scoped CSS, no schema
-                continue
-            else:
-                errors.append(f"unexpected file in zip: {name}")
-                continue
-            data = json.loads(zf.read(name))
-            if kind == "term" and len(data) > 10_000:
-                errors.append(f"{name}: {len(data)} entries (> 10000)")
-            for msg in validators[kind](data):
+    if any("/" in n for n in names):
+        errors.append("zip contains subfolders: " + ", ".join(n for n in names if "/" in n)[:200])
+    if "index.json" not in names:
+        errors.append("index.json missing")
+    if not any(_member_kind(n) == "term" for n in names):
+        errors.append("no term_bank_N.json files")
+    tasks = []
+    for name in names:
+        kind = _member_kind(name)
+        if kind is None:
+            errors.append(f"unexpected file in zip: {name}")
+        elif kind:
+            tasks.append((name, kind))
+
+    def collect(results) -> None:
+        for name, size, member_errors in results:
+            for msg in member_errors:
                 errors.append(f"{name}: {msg}")
                 if len(errors) >= max_errors:
-                    return errors
-            print(f"  [validate] {name}: ok ({len(data) if isinstance(data, list) else 'index'})",
-                  file=sys.stderr, flush=True)
-    return errors
+                    return
+            status = f"{len(member_errors)} error(s)" if member_errors else f"ok ({size})"
+            print(f"  [validate] {name}: {status}", file=sys.stderr, flush=True)
+
+    workers = worker_count(workers, len(tasks))
+    if workers == 1:
+        _init_worker(zip_path, schema_dir, engine)
+        try:
+            collect(map(_check_member, tasks))
+        finally:
+            _worker.pop("zip").close()
+            _worker.clear()
+    else:
+        pool = ProcessPoolExecutor(workers, initializer=_init_worker, initargs=(zip_path, schema_dir, engine))
+        try:
+            collect(pool.map(_check_member, tasks))
+        finally:
+            pool.shutdown(cancel_futures=True)  # after max_errors, drop what has not started
+    return errors[:max_errors]
 
 
 def flatten_content(node) -> str:

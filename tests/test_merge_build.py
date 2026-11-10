@@ -5,7 +5,7 @@ import zipfile
 
 import pytest
 
-from baike2yomitan.build import TITLE_FULL, TITLE_LEX, build, default_title, structured_content
+from baike2yomitan.build import TITLE_FULL, TITLE_LEX, Traditional, build, default_title, structured_content
 from baike2yomitan.merge import merge
 from baike2yomitan.records import Record, RecordWriter, iter_records
 from baike2yomitan.sense import sense_rank_key
@@ -112,6 +112,27 @@ def test_structured_content_order_and_footer():
     # a sense label identical to the title is not rendered
     rec2 = dict(rec, sense_label="丰颐", infobox=None)
     assert [p["data"]["baike"] for p in structured_content(rec2, False)["content"]] == ["summary", "footer"]
+
+
+def test_traditional_modes():
+    # s2tw writes Taiwan character forms; s2t keeps 着 and uses 裏/爲; neither rewrites vocabulary
+    tw, std = Traditional("s2tw"), Traditional("s2t")
+    assert [tw(w) for w in ("不着四六", "里面", "为什么", "软件")] == ["不著四六", "裡面", "為什麼", "軟件"]
+    assert [std(w) for w in ("不着四六", "里面", "为什么")] == ["不着四六", "裏面", "爲什麼"]
+
+
+def test_cli_offers_s2tw(tmp_path, monkeypatch):
+    from baike2yomitan.cli import main
+
+    monkeypatch.setattr("baike2yomitan.report.STATS_DIR", str(tmp_path / "stats"))  # not the repo's data/stats
+    _write(tmp_path / "r.jsonl", [_primary("不着四六", 7, "不着四六，汉语成语，形容说话做事不着边际、不合规矩。")])
+    out = tmp_path / "d.zip"
+    assert main(["build", "--records", str(tmp_path / "r.jsonl"), "--out", str(out),
+                 "--traditional", "s2tw", "--no-validate"]) == 0
+    with zipfile.ZipFile(out) as zf:
+        rows = json.loads(zf.read("term_bank_1.json"))
+    assert [r[0] for r in rows] == ["不着四六", "不著四六"]
+    assert rows[0][5] == rows[1][5] and rows[0][6] == rows[1][6]  # same content and sequence number
 
 
 def test_structured_content_terms_header():
