@@ -267,6 +267,16 @@ Yomitan → Settings → General → *Result grouping mode* → **Group related 
 only the spelling that was looked up. `index.json` sets `sequenced: true`, which
 the merge mode requires.
 
+If a simplified lookup shows two cards in the default mode (板儿砖, then 板兒磚)
+while the traditional lookup shows one, another enabled dictionary is
+redirecting the word: Wiktionary-based dictionaries carry entries that mark
+板儿砖 as a form of 板兒磚, and Yomitan then looks up the traditional spelling
+in every dictionary and finds this one's second entry. Words the other
+dictionary does not list (不着四六) are unaffected. To stop it, open that
+dictionary's details in Yomitan → Settings → Dictionaries and switch off
+*Use deinflections*, or use the merge mode above with this dictionary as the
+main dictionary.
+
 With `--pinyin` the reading (`yí mín`) is attached to both spellings; the
 traditional headword reuses the reading chosen for the simplified title.
 
