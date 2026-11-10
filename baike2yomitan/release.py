@@ -122,15 +122,79 @@ def _load_stats(stats_dir: str, name: str) -> dict:
         return json.load(f)
 
 
+# A row of the table release_notes writes, and a pin from its "Inputs pinned" line.
+_NOTES_ROW_RE = re.compile(
+    r"^\| `(?P<file>[^`]+)` \|[^|]*\|[^|]*\| (?P<entries>[\d,]+) \| (?P<traditional>[\d,]+) \| (?P<banks>[\d,]+) \|",
+    re.M)
+_NOTES_PIN_RE = re.compile(r"`(?P<repo>[^`@\s]+)@(?P<revision>[0-9a-f]{7,40})`")
+MAX_LISTED_COMMITS = 40
+
+
+def _delta(now: int, before: int | None) -> str:
+    if before is None:
+        return f"{now:,} (new)"
+    return f"{now:,} ({now - before:+,})" if now != before else f"{now:,} (same)"
+
+
+def changes_since(previous: dict, rows: list[tuple[str, int, int, int]], pins: dict[str, str],
+                  commits: list[str] | None, repo: str | None = None, tag: str | None = None) -> list[str]:
+    """Lines of the "Changes since <tag>" section.
+
+    `previous` is the release before this one ({"tagName", "body"}); its body is
+    read for the numbers this command wrote there. `rows` are this release's
+    (file, entries, traditional, term banks); `pins` its inputs (repo -> commit);
+    `commits` the subjects of the commits since the previous tag, None when they
+    could not be listed. With `repo` and `tag` (this release's) the section
+    ends with a link to GitHub's comparison of the two tags, like the one
+    GitHub's own release notes carry. A part that cannot be worked out is
+    left out."""
+    prev_tag, body = previous.get("tagName") or "the previous release", previous.get("body") or ""
+    before = {m["file"]: tuple(int(m[k].replace(",", "")) for k in ("entries", "traditional", "banks"))
+              for m in _NOTES_ROW_RE.finditer(body)}
+    lines = ["", f"## Changes since {prev_tag}", ""]
+    if before:
+        lines += ["| file | entries | traditional | term banks |", "|---|---:|---:|---:|"]
+        for name, entries, traditional, banks in rows:
+            old = before.get(name, (None, None, None))
+            lines.append(f"| `{name}` | {_delta(entries, old[0])} | {_delta(traditional, old[1])} | "
+                         f"{_delta(banks, old[2])} |")
+        lines.append("")
+    old_pins = {m["repo"]: m["revision"] for m in _NOTES_PIN_RE.finditer(body)}
+    if old_pins and pins:
+        moved = [f"`{repo}` {old_pins[repo][:12]} → {rev[:12]}" for repo, rev in pins.items()
+                 if repo in old_pins and not (rev.startswith(old_pins[repo]) or old_pins[repo].startswith(rev))]
+        added = [f"`{repo}` (new)" for repo in pins if repo not in old_pins]
+        lines += ["**Inputs:** " + ("; ".join(moved + added) + "." if moved or added
+                                    else "the same dataset commits as the previous release."), ""]
+    if commits:
+        shown = commits[:MAX_LISTED_COMMITS]
+        lines.append(f"**Code:** {len(commits)} commit{'s' if len(commits) != 1 else ''}.")
+        lines += [f"- {c}" for c in shown]
+        if len(commits) > len(shown):
+            lines.append(f"- … and {len(commits) - len(shown)} more")
+    elif commits is not None:
+        lines.append("**Code:** no commits; the same code as the previous release.")
+    if repo and tag and previous.get("tagName"):
+        span = f"{previous['tagName']}...{tag}"
+        lines += ["", f"**Full Changelog**: [{span}](https://github.com/{repo}/compare/{span})"]
+    return lines if len(lines) > 3 else []
+
+
 def release_notes(zips: list[str], indexes: list[dict], stats_dir: str = os.path.join("data", "stats"),
-                  today: _dt.date | None = None) -> str:
+                  today: _dt.date | None = None, previous: dict | None = None,
+                  commits: list[str] | None = None, repo: str | None = None, tag: str | None = None) -> str:
+    """`previous` ({"tagName", "body"} of the release before this one) adds a
+    "Changes since" section; `commits` are the commit subjects since its tag,
+    `repo` and `tag` (this release's) give it the Full Changelog link."""
     today = today or _dt.date.today()
     lines = [f"Baidu Baike → Yomitan dictionaries, built {today.isoformat()}.", "",
              "| file | dictionary | revision | entries | traditional | term banks | size |",
              "|---|---|---|---:|---:|---:|---:|"]
+    rows: list[tuple[str, int, int, int]] = []
     for z, idx in zip(zips, indexes):
         s = _load_stats(stats_dir, "build_" + zip_stem(z))
         size = s.get("zip_bytes") or (os.path.getsize(z) if os.path.exists(z) else 0)
+        rows.append((os.path.basename(z), s.get("entries", 0), s.get("entries_traditional", 0), s.get("term_banks", 0)))
         lines.append(f"| `{os.path.basename(z)}` | {idx.get('title', '')} | {idx.get('revision', '')} | "
                      f"{s.get('entries', 0):,} | {s.get('entries_traditional', 0):,} | "
                      f"{s.get('term_banks', 0):,} | {size / 1e6:,.0f} MB |")
@@ -139,12 +203,16 @@ def release_notes(zips: list[str], indexes: list[dict], stats_dir: str = os.path
         lines += ["", "Records: primary {:,} · overlay {:,} · merged {:,} (see `data/extract_report.md`).".format(
             p.get("records_written", 0), h.get("records_written", 0), m.get("records_written", 0))]
     manifest_path = os.path.join(os.path.dirname(stats_dir.rstrip("/\\")) or ".", "source-inputs.json")
+    current_pins: dict[str, str] = {}
     if os.path.exists(manifest_path):
         with open(manifest_path, encoding="utf-8") as f:
             srcs = json.load(f).get("sources", {})
-        pins = ", ".join(f"`{s['repo_id']}@{s['revision'][:12]}`" for s in srcs.values() if s.get("revision"))
+        current_pins = {s["repo_id"]: s["revision"] for s in srcs.values() if s.get("revision")}
+        pins = ", ".join(f"`{repo}@{rev[:12]}`" for repo, rev in current_pins.items())
         if pins:
             lines += ["", f"Inputs pinned in `data/source-inputs.json`: {pins}."]
+    if previous:
+        lines += changes_since(previous, rows, current_pins, commits, repo, tag)
     lines += ["", "**Import:** Yomitan → Settings → Dictionaries → Import → pick the zip. "
               "**Update:** the zips are self-updating; Yomitan → Settings → Dictionaries → *Check for updates*.",
               "", "Content is Baidu Baike user-contributed material mirrored by third parties "
@@ -186,6 +254,34 @@ def repo_has_commits(repo: str) -> bool:
         raise
 
 
+def previous_release(repo: str) -> dict | None:
+    """The newest published release ({"tagName", "body"}), None when there is none."""
+    try:
+        return json.loads(_gh(["release", "view", "--repo", repo, "--json", "tagName,body"]))
+    except (ReleaseError, ValueError):
+        return None
+
+
+def commits_between(repo: str, base: str, head: str) -> list[str] | None:
+    """Subjects of the commits after `base` up to `head`, oldest first, through
+    GitHub's compare API (no local history needed). None when GitHub cannot
+    compare them, for example when `head` has not been pushed."""
+    try:
+        out = _gh(["api", f"repos/{repo}/compare/{base}...{head}", "--jq",
+                   '.commits[].commit.message | split("\n")[0]'])
+    except ReleaseError:
+        return None
+    return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def _local_head() -> str | None:
+    try:
+        r = subprocess.run(["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True)
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return r.stdout.strip() or None
+
+
 def release_exists(repo: str, tag: str) -> bool:
     try:
         _gh(["release", "view", tag, "--repo", repo, "--json", "tagName"])
@@ -205,7 +301,7 @@ def _fmt(cmd: list[str]) -> str:
 def release(zips: list[str], *, repo: str | None = None, tag: str | None = None, title: str | None = None,
             notes_file: str | None = None, draft: bool = False,
             dry_run: bool = False, stats_dir: str = os.path.join("data", "stats"),
-            out=None) -> int:
+            out=None, target: str | None = None) -> int:
     """Upload zips + sidecar index files as one GitHub release. Returns 0 on
     success; raises ReleaseError on any problem (in --dry-run, problems that gh
     would hit later are reported as warnings instead and the commands are printed)."""
@@ -275,11 +371,20 @@ def release(zips: list[str], *, repo: str | None = None, tag: str | None = None,
     tag = tag or f"v{indexes[0].get('revision')}"
     title = title or tag
 
+    target = target or (os.environ.get("GITHUB_SHA") if in_actions else None)
     if notes_file is None:
+        previous = commits = None
+        if shutil.which("gh") and info:
+            previous = previous_release(repo)
+            if previous and previous.get("tagName") == tag:
+                previous = None          # uploading to the newest release again: nothing to compare with
+            if previous:
+                head = target or _local_head()
+                commits = commits_between(repo, previous["tagName"], head) if head else None
         os.makedirs("dist", exist_ok=True)
         notes_file = os.path.join("dist", f"{tag}.notes.md")
         with open(notes_file, "w", encoding="utf-8") as f:
-            f.write(release_notes(zips, indexes, stats_dir))
+            f.write(release_notes(zips, indexes, stats_dir, previous=previous, commits=commits, repo=repo, tag=tag))
     assets = [a for pair in zip(zips, sidecars) for a in pair]
 
     exists = False
@@ -294,6 +399,11 @@ def release(zips: list[str], *, repo: str | None = None, tag: str | None = None,
             cmds.append(["release", "edit", tag, "--repo", repo, "--latest", "--notes-file", notes_file])
     else:
         create = ["release", "create", tag, *assets, "--repo", repo, "--title", title, "--notes-file", notes_file]
+        # Without --target gh tags the default branch's head at publish time,
+        # which is not the built commit when something was pushed during the
+        # build. In Actions GITHUB_SHA is the commit the workflow checked out.
+        if target:
+            create += ["--target", target]
         create += ["--draft"] if draft else ["--latest"]
         cmds = [create]
 

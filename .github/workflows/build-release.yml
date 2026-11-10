@@ -5,6 +5,9 @@ name: Build and release
 # "Check for updates" picks them up. Needs ~27 GB of disk. The first three runs
 # took 2 h 02 min to 3 h 32 min on a standard runner, most of it single-process
 # schema validation; with validation on every core the fourth took 1 h 32 min.
+# Validation now checks each distinct entry shape once, and `all` ends with a
+# quality audit whose golden-word checks fail the build; neither has been
+# timed on a runner yet.
 
 on:
   workflow_dispatch:
@@ -36,6 +39,12 @@ jobs:
     env:
       PYTHONUTF8: "1"
       HF_XET_HIGH_PERFORMANCE: "1"
+    defaults:
+      run:
+        # Naming the shell makes Actions run it as `bash -eo pipefail`. With the
+        # default (`bash -e`) a failing `python ... | tee log` still succeeds,
+        # and a build whose validation failed would be published.
+        shell: bash
     steps:
       - uses: actions/checkout@v7
 
@@ -61,9 +70,17 @@ jobs:
         run: python -m pip install -r requirements.txt
 
       - name: Choose the revision
+        env:
+          # Passed through the environment, never pasted into the script text.
+          INPUT_REVISION: ${{ inputs.revision }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          rev="${{ inputs.revision }}"
-          [ -n "$rev" ] || rev="$(date -u +%Y.%m.%d).${{ github.run_number }}"
+          rev="$INPUT_REVISION"
+          [ -n "$rev" ] || rev="$(date -u +%Y.%m.%d).$RUN_NUMBER"
+          if ! [[ "$rev" =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then
+            echo "::error::revision '$rev' must be four dot-separated integers, e.g. 2026.11.09.12"
+            exit 1
+          fi
           echo "REVISION=$rev" >> "$GITHUB_ENV"
           echo "revision $rev"
 
