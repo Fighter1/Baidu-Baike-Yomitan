@@ -100,17 +100,17 @@ def test_default_sense_detection():
     a, b = mk("甲", "", False), mk("甲", "第二义项", True)
     assign_default_senses([a, b])
     assert (a.is_default_sense, b.is_default_sense) == (False, True)
-    # else the sense with no subtitle
+    # no id-less capture: nothing says which sense is the main one, not a
+    # missing subtitle and not being the only sense captured
     a, b = mk("乙", "义项一", False), mk("乙", "", False)
     assign_default_senses([a, b])
-    assert (a.is_default_sense, b.is_default_sense) == (False, True)
-    # neither: a single sense is default, several are all False
+    assert (a.is_default_sense, b.is_default_sense) == (None, None)
     (c,) = [mk("丙", "义项", False)]
     assign_default_senses([c])
-    assert c.is_default_sense is True
+    assert c.is_default_sense is None
     d, e = mk("丁", "一", False), mk("丁", "二", False)
     assign_default_senses([d, e])
-    assert (d.is_default_sense, e.is_default_sense) == (False, False)
+    assert (d.is_default_sense, e.is_default_sense) == (None, None)
 
 
 def test_extract_dedupes_and_prefers_clean_newest(overlay_rows, tmp_path):
@@ -126,11 +126,81 @@ def test_extract_dedupes_and_prefers_clean_newest(overlay_rows, tmp_path):
     assert titles["金陵十二钗又副册"] == 0  # obfuscated, no clean duplicate
     assert stats["drop:obfuscated_no_clean_duplicate"] == 1
     assert stats["drop:disambiguation_page"] >= 1  # 李伶, and one 李佳军 snapshot
-    assert titles["李佳军"] == 1
-    assert stats["dup:title_subtitle"] >= 3
+    assert titles["李佳军"] == 2  # two different people (ids 19897394 and 22077375), both without a subtitle
+    assert stats["dup:lemma_id"] + stats["dup:title_subtitle"] + stats["dup:idless_same_summary"] >= 3
     # 东方早报: (title, None) and (title, subtitle) share lemma 6637501 → folded, subtitle kept
     dfzb = [r for r in recs if r["title"] == "东方早报"]
     assert len(dfzb) == 1 and dfzb[0]["sense_label"] == "2003年上海文汇新民联合报业集团出版报刊"
     assert dfzb[0]["snapshot_date"] == "2023-03-07"  # newest clean snapshot
     assert dfzb[0]["is_default_sense"] is True
     assert all(r["source"] == "hf" for r in recs)
+
+
+def _snap(title, item_id, content, subtitle=None, ts=20220101000000):
+    base = "https://baike.baidu.com/item/" + title + (f"/{item_id}" if item_id else "")
+    return {"title": title, "subtitle": subtitle, "timestamp": ts, "base_url": base, "url": "", "archive_url": "a",
+            "content": content}
+
+
+def _extract(rows, tmp_path):
+    pq.write_table(pa.Table.from_pylist(rows), str(tmp_path / "rows.parquet"))
+    stats = extract(str(tmp_path / "rows.parquet"), str(tmp_path / "hf.jsonl"), progress_every=0)
+    return list(iter_records(str(tmp_path / "hf.jsonl"))), stats
+
+
+def test_links_keep_reserved_characters_encoded():
+    assert decode_url("https://baike.baidu.com/item/C%23/195147") == "https://baike.baidu.com/item/C%23/195147"
+    assert decode_url("https://baike.baidu.com/item/AC%2FDC/1234") == "https://baike.baidu.com/item/AC%2FDC/1234"
+    assert decode_url("https://baike.baidu.com/item/100%25/5678") == "https://baike.baidu.com/item/100%25/5678"
+    assert decode_url("https://baike.baidu.com/item/%E4%B8%B0%E9%A2%90/2036679#3") == "https://baike.baidu.com/item/丰颐/2036679"
+    assert decode_url("https://baike.baidu.com/item/Guns%20N%27%20Roses") == "https://baike.baidu.com/item/Guns%20N'%20Roses"
+    assert title_from_url("https://baike.baidu.com/item/C%23/195147") == "C#" and decode_url(None) == ""
+
+
+def test_a_list_of_names_is_not_garbled_text():
+    page = ("宋史是二十四史之一，收录于《四库全书》史部正史类，由元朝丞相脱脱和阿鲁图先后主持修撰。" * 3
+            + " 列传第十七 子 璨 玮 琮 曹彬 潘美 李超 列传第十八 张美 郭守文 尹崇珂 ")
+    assert not is_obfuscated(page)
+    assert not is_obfuscated("五行是中国古代哲学的一种系统观，指金 木 水 火 土 五种物质的运动变化。")
+    assert is_obfuscated("金 陵 十 二 钗 又 副 册 是 红 楼 梦 中 的 人 物 分 类")
+
+
+def test_an_article_that_opens_with_its_title_and_a_colon_is_not_a_sense_list():
+    abstract = "七十子：指的就是孔门七十二贤。七十，是举其成数。"
+    page = abstract + " " + abstract + " 七十子解释编辑播报 孔子弟子三千，其中贤者七十二人，后世称为七十子，见于《史记》等书的记载。" * 2
+    assert not is_disambiguation(page, "七十子")
+    rec = convert(_snap("七十子", 123, page), collections.Counter(), 300)
+    assert rec is not None and rec.summary == abstract
+    assert is_disambiguation("李伶：重庆医科大学教授 李伶：原第二炮兵政治部文艺创作室主任 李伶：沈阳市苏家屯区副区长", "李伶")
+
+
+def test_same_title_with_different_ids_stays_two_articles(tmp_path):
+    king = "亨利五世（Henry V，1387年—1422年），英格兰兰开斯特王朝国王，在位期间重新发动了百年战争。"
+    play = "《亨利五世》是英国剧作家威廉·莎士比亚创作的戏剧，1599年上演，1600年首次出版。"
+    rows = [_snap("亨利五世", 1428746, f"{king} {king} 正文", ts=20211101000000),
+            _snap("亨利五世", 23221848, f"{play} {play} 正文", ts=20220420000000),
+            _snap("亨利五世", 23221848, f"{play} {play} 正文", ts=20210101000000),   # an older snapshot of the play
+            _snap("亨利五世", None, f"{king} {king} 正文", ts=20230101000000)]        # the bare title shows the king
+    recs, stats = _extract(rows, tmp_path)
+    by_id = {r["lemma_id"]: r for r in recs}
+    assert sorted(by_id) == [1428746, 23221848]
+    assert stats["dup:lemma_id"] == 1 and stats["dup:idless_same_summary"] == 1
+    assert by_id[1428746]["is_default_sense"] is True and by_id[1428746]["snapshot_date"] == "2023-01-01"
+    assert by_id[23221848]["is_default_sense"] is False and by_id[23221848]["snapshot_date"] == "2022-04-20"
+    assert by_id[1428746]["url"].endswith("/item/亨利五世/1428746")
+
+
+def test_a_clean_snapshot_beats_a_garbled_one_that_has_a_subtitle(tmp_path):
+    clean = "丧，汉语一级字，读作sāng或sàng，最早见于甲骨文，本义是丢掉、失去。"
+    garbled = "丧 ， 汉 语 一 级 字 ， 读 作 s ā n g 或 s à n g ， 最 早 见 于 甲 骨 文 。"
+    rows = [_snap("丧", 99, f"{garbled} {garbled} 正 文", subtitle="汉语汉字", ts=20240101000000),
+            _snap("丧", 99, f"{clean} {clean} 正文", ts=20220101000000)]
+    recs, stats = _extract(rows, tmp_path)
+    assert len(recs) == 1 and recs[0]["summary"] == clean and recs[0]["sense_label"] == "汉语汉字"
+    assert stats["drop:obfuscated_no_clean_duplicate"] == 0
+
+
+def test_interface_words_stay_headwords_in_the_overlay():
+    text = "编辑，是对资料或现成的作品进行整理、加工的工作，也指从事这种工作的人。"
+    rec = convert(_snap("编辑", 535978, f"{text} {text} 正文"), collections.Counter(), 300)
+    assert rec.title == "编辑" and rec.summary == text

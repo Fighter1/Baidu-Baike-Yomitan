@@ -174,3 +174,116 @@ from shards 0000 and 0004.
    as muted footer text (first five) and used only for `--exclude-tags`.
 10. **Traditional headwords** via OpenCC `s2t` by default (`s2twp` available);
     only emitted when the converted title differs.
+
+
+## Review of 2026-11-10: what was wrong in release 2026.11.10.4 and what changed
+
+Four read-only review passes over the code and the published zips found the
+problems below; each was reproduced before it was fixed. Counts are from the
+local build of 2026-11-10 unless a line says otherwise.
+
+**Extraction, primary**
+
+- A summary field was accepted on length alone. A field that holds only the
+  title's pinyin or bopomofo, or the title again, now gives way to the
+  sections (2,170 records) or, when the page has nothing else, is dropped
+  (`summary_not_prose`, 73,731 records). Those records used to be entries that
+  showed the pinyin a second time as their definition. A foreign name counts as
+  content (刺鱼目（Gasterosteiformes）), and so do accents in capitalised words
+  (José Martí): an earlier version of the rule took those for pinyin.
+- Tried and withdrawn: replacing a summary field that looks like one
+  `key：value` line by a section paragraph. On real rows it made about as many
+  entries worse as better (the abstract 粉虱科（学名：Aleyrodidae）是… was
+  thrown away), so such a field is kept as before.
+- `解释：`/`释义：`/`【解释】`-style lines are now taken for their value
+  (16,860 records; 鱼游濠上, 片刻). They used to be skipped as infobox lines,
+  after which the next long paragraph, a source citation, became the summary.
+- A colon inside brackets, after the title itself, between digits or before
+  reported speech no longer makes a line an infobox line. This alone brought
+  back about 20,000 pages whose only prose opens `《X：Y》…`
+  (`summary_not_prose_fallback` 50,662, was 70,771).
+- The under-15-character keep rules look at the whole page, not only the first
+  paragraph (16,262 short sentences kept, was 11,075).
+- Titles are no longer cleaned like body text: 编辑, 语音 and 播报 had been
+  erased as interface labels, and 语音编辑器 had become 器.
+- A gallery caption inside a sentence is cut at the article title instead of
+  taking the twelve characters before every `(N张)`.
+- The page's own pinyin line is kept as a `拼音` infobox row when the summary
+  comes from the sections and does not contain it (73,039 records). Without
+  it the definition-line rule above would have cost idioms their stated
+  reading (被褐藏辉 guessed as bèi… instead of pī…).
+
+**Extraction, overlay** (401,223 records, was 382,823)
+
+- Snapshots were folded by (title, subtitle), which merged different articles
+  that share a title and have no subtitle (亨利五世 the king and the play; two
+  people called 李佳军 in the test fixture). They are now folded by article id.
+- The four-spaced-characters shortcut flagged tables and name lists as garbled
+  text; the test is now the share of lone characters only.
+- An article whose abstract opens `<title>：` was dropped as a sense list
+  (七十子). `drop:disambiguation_page` 26,779, was 29,741.
+- `is_default_sense` used to be true for any sense without a subtitle and for
+  any lone sense. That marked new song and film pages as the main sense of
+  common words. It is now true only for the sense an id-less snapshot shows
+  (142,457 records, was 340,016).
+- Links keep `#`, `%`, `?` and `/` percent-encoded.
+
+**Merge** (heuristic 5 below is superseded)
+
+- The refresh compared nothing: the overlay's "default" sense replaced the 2019
+  article of the same title. 大学 became a documentary film, 北京 a song. Texts
+  are now compared (see README, *Merge semantics*): 178,963 refreshes
+  (143,584 same text, 23,525 likely the same article, 11,854 a weak 2019 text
+  replaced), 51,944 primary records kept as they were
+  (20,485 because the overlay is about something else).
+- 2,757 overlay senses that repeat one already written are not added again, and
+  20,956 fallback abstracts, stubs and pinyin-only abstracts are not added next to an
+  existing article.
+- Cost of being careful: an article whose text was rewritten between 2019 and
+  2022 beyond recognition is kept in both versions.
+
+**Ranking** (heuristic 6 below is superseded): default sense, then the word
+before other articles and works last, then a real abstract, then the lower id.
+
+**Readings**
+
+- CC-CEDICT words with several readings took CC-CEDICT's first lower-case one,
+  often the rare one (明朝 míng zhāo, 教授 jiāo shòu), because the pypinyin
+  guess that should have chosen had been overwritten by loading that very
+  reading as a phrase. The guess is now taken before the phrases are loaded.
+- An article that lists several readings of its title, as articles about
+  single characters do, no longer decides (了 was read liǎo, 通 tòng).
+- Guessed readings keep Latin letters and digits.
+- Against release 2026.11.10.4 the first sense's reading changed for 433,960
+  of 4.76 M shared headwords; for 416,582 only letters or digits were added.
+  The other 17,378 are mostly corrections of the kind above (教学 jiào xué,
+  重点 zhòng diǎn, 外传 wài zhuàn); some are debatable, for example 朝阳 in the
+  names of companies in 朝阳市 is now zhāo yáng.
+
+**Traditional headwords**: titles that start with a surname character OpenCC
+converts (于, 范, 余, 岳 …) are indexed under both spellings.
+
+**Lexical tag filter**: 1,662 records of ordinary words that carry a 人物/企业/学校
+tag are kept (2,167 are still dropped).
+
+**Effect on the zips**, against release 2026.11.10.4:
+
+| | full, before | full, now | lexical, before | lexical, now |
+|---|---:|---:|---:|---:|
+| headwords | 4,832,500 | 4,795,093 | 81,377 | 81,843 |
+| senses | 4,888,775 | 4,872,771 | 98,929 | 104,436 |
+| entries (rows) | 8,809,667 | 8,813,748 | 159,636 | 167,014 |
+
+Full: 69,446 headwords gone (pinyin-only pages), 32,039 new. Lexical: 1,969
+gone, 2,435 new. The lexical headwords that went include common idioms whose
+Baike page holds nothing but the pinyin (老调重弹, 有朝一日, 独辟蹊径).
+
+**Audit of the new zips** (`audit`): headwords with a repeated sense 125 (full)
+and 0 (lexical); headwords whose first sense is a work with another kind of
+sense below it 2,196 and 62; summaries that say nothing 386 and
+71; summaries starting at item 2 of a list 14,403 and 396; summaries cut inside
+a quote or bracket 8,149 and 129. The last two are not addressed.
+
+**Not fixed**: an ambiguous character later in a title (子丑寅卯 → 子醜寅卯);
+overlay records have no tags, so the lexical tag filter never sees them;
+summaries that start in the middle of a numbered list.

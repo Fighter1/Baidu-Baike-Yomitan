@@ -5,13 +5,17 @@ this order of preference:
 
 1. ``data/pinyin_overrides.tsv`` - hand-checked ``title<TAB>reading`` lines;
 2. CC-CEDICT, when the title is a CC-CEDICT headword (several readings: the
-   one the article states, else the one closest to the pypinyin guess);
+   one the article states, when it states exactly one of them and the title
+   is not a single character; else the one pypinyin's own phrase list gives;
+   else the first lower-case one);
 3. the article's own pinyin, when its infobox or summary states one that fits
    the title character by character (``拼音是zì kuài yǐ xià``);
 4. the same, borrowed from another sense of the same title;
 5. pypinyin - a per-character guess helped by a phrase list. CC-CEDICT's
    words are loaded into that list, so a longer title that contains one
-   (``不粘锅炒饭``) inherits its reading (``zhān``, not ``nián``).
+   (``不粘锅炒饭``) inherits its reading (``zhān``, not ``nián``). Latin letters
+   and digits in a title are kept as they are (``Linux高级程序设计`` ->
+   ``Linux gāo jí …``), the way CC-CEDICT writes ``K jīn`` for K金.
 
 Readings are lower-case, tone-marked syllables separated by spaces.
 """
@@ -100,7 +104,7 @@ def load_overrides(path: str = OVERRIDES_PATH) -> dict[str, str]:
     out: dict[str, str] = {}
     if not path or not os.path.exists(path):
         return out
-    with open(path, encoding="utf-8") as f:
+    with open(path, encoding="utf-8-sig") as f:  # tolerate the BOM some editors add
         for n, line in enumerate(f, 1):
             line = line.rstrip("\n")
             if not line.strip() or line.lstrip().startswith("#"):
@@ -114,7 +118,7 @@ def load_overrides(path: str = OVERRIDES_PATH) -> dict[str, str]:
 
 # --- the article's own pinyin -------------------------------------------------
 
-_PINYIN_CHARS = "A-Za-zɑɡüÜāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜńňǹ"
+_PINYIN_CHARS = "A-Za-zɑɡüÜāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜńňǹĀÁǍÀĒÉĚÈĪÍǏÌŌÓǑÒŪÚǓÙ"
 _PINYIN_RUN = re.compile(f"[{_PINYIN_CHARS}][{_PINYIN_CHARS} '’\\-·]*")
 _SEPARATORS = re.compile(r"[ '’\-·]")
 _INFOBOX_KEYS = ("拼音", "读音", "注音", "发音")
@@ -163,24 +167,43 @@ def fit_pinyin(title: str, run: str) -> str | None:
     return " ".join(out) if walk(0, 0) else None
 
 
-def stated_pinyin(rec: dict) -> str | None:
-    """The pinyin the article itself gives for its title, if any: a 拼音-like
-    infobox row, or any run of Latin letters in the summary that fits the
-    title character by character."""
+def stated_pinyins(rec: dict) -> list[str]:
+    """Every pinyin the article itself gives for its title, in order of
+    appearance: 拼音-like infobox rows first, then runs of Latin letters in the
+    summary that fit the title character by character."""
     title = rec.get("title") or ""
     if not is_cjk(title):
-        return None
+        return []
     texts = [str(v) for k, v in (rec.get("infobox") or []) if any(key in str(k) for key in _INFOBOX_KEYS)]
     texts.append((rec.get("summary") or "")[:300])
+    found: list[str] = []
     for text in texts:
         for m in _PINYIN_RUN.finditer(unicodedata.normalize("NFC", text)):
             fitted = fit_pinyin(title, m.group(0))
-            if fitted:
-                return fitted
-    return None
+            if fitted and fitted not in found:
+                found.append(fitted)
+    return found
+
+
+def stated_pinyin(rec: dict) -> str | None:
+    """The first pinyin the article itself gives for its title, if any."""
+    found = stated_pinyins(rec)
+    return found[0] if found else None
 
 
 # --- putting it together ------------------------------------------------------
+
+_ASCII_RUN = re.compile(r"[A-Za-z0-9]+")
+# word -> what pypinyin says before any CC-CEDICT phrase is loaded into it.
+# load_phrases_dict changes pypinyin for the whole process, so the untouched
+# answer has to be taken first and remembered across Readings objects.
+_pristine_guess: dict[str, str] = {}
+
+
+def _keep_ascii(chunk: str) -> list[str]:
+    """pypinyin `errors` callback: keep letter and digit runs, drop punctuation."""
+    return _ASCII_RUN.findall(chunk)
+
 
 class Readings:
     """Callable: record -> (reading, source). ``source`` is one of ``override``,
@@ -193,9 +216,20 @@ class Readings:
         self.overrides = load_overrides(overrides_path) if overrides_path else {}
         self.cedict = load_cedict_readings(cedict_path) if cedict_path else {}
         self._shared: dict[str, collections.Counter] = {}
+        # Words with several CC-CEDICT readings: pypinyin's own phrase list
+        # usually knows the everyday one (明朝 míng cháo, 教授 jiào shòu), where
+        # CC-CEDICT's first lower-case entry is the rare one (míng zhāo
+        # "tomorrow morning", jiāo shòu "to instruct"). Ask before the phrases
+        # are loaded: afterwards pypinyin only repeats what it was told.
+        self._preferred: dict[str, str] = {}
         phrases = {}
         for word, readings in self.cedict.items():
-            self._add_phrase(phrases, word, readings[0])
+            reading = readings[0]
+            if len(readings) > 1 and len(word) > 1 and is_cjk(word):
+                if word not in _pristine_guess:
+                    _pristine_guess[word] = " ".join(lazy_pinyin(word, style=Style.TONE, errors="ignore"))
+                reading = self._preferred[word] = self._closest(readings, _pristine_guess[word])
+            self._add_phrase(phrases, word, reading)
         for word, reading in self.overrides.items():
             self._add_phrase(phrases, word, reading)
         if phrases:
@@ -212,7 +246,7 @@ class Readings:
     def guess(self, title: str) -> str:
         if not any("一" <= ch <= "鿿" for ch in title):
             return ""
-        return " ".join(self._lazy(title, style=self._style, errors="ignore"))
+        return " ".join(self._lazy(title, style=self._style, errors=_keep_ascii))
 
     def observe(self, rec: dict) -> None:
         """First pass: remember what each title's articles say, so a sense that
@@ -224,12 +258,10 @@ class Readings:
         if stated:
             self._shared.setdefault(title, collections.Counter())[stated] += 1
 
-    def _pick_cedict(self, title: str, candidates: list[str], stated: str | None) -> str:
-        if len(candidates) == 1:
-            return candidates[0]
-        if stated and stated in candidates:
-            return stated
-        guess = self.guess(title)
+    @staticmethod
+    def _closest(candidates: list[str], guess: str) -> str:
+        """The candidate a guess points at: the same reading, else the same
+        syllables with other tones, else the first candidate."""
         if guess in candidates:
             return guess
         bare = strip_tones(guess)
@@ -238,13 +270,28 @@ class Readings:
                 return c
         return candidates[0]
 
+    def _pick_cedict(self, title: str, candidates: list[str], stated: str | None) -> str:
+        if len(candidates) == 1:
+            return candidates[0]
+        if stated and stated in candidates:
+            return stated
+        return self._preferred.get(title) or self._closest(candidates, self.guess(title))
+
     def __call__(self, rec: dict) -> tuple[str, str]:
         title = rec.get("title") or ""
         if title in self.overrides:
             return self.overrides[title], "override"
         candidates = self.cedict.get(title)
         if candidates:
-            stated = stated_pinyin(rec) if len(candidates) > 1 else None
+            stated = None
+            if len(candidates) > 1 and len(title) > 1:
+                # The article's pinyin decides only when it names exactly one of
+                # the readings (朝阳（cháo yáng）是北京的一个区). An article about
+                # the word itself lists them all (读cháo yáng时…读zhāo yáng时…),
+                # and an article about a character always does: 了（拼音：liǎo、le）
+                # does not mean that 了 is read liǎo.
+                named = [p for p in stated_pinyins(rec) if p in candidates]
+                stated = named[0] if len(named) == 1 else None
             return self._pick_cedict(title, candidates, stated), "cedict"
         stated = stated_pinyin(rec)
         if stated:

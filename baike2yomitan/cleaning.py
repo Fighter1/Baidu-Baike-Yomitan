@@ -14,8 +14,13 @@ _CITATION_RE = re.compile(r"[\[［]\s*\d{1,3}(?:\s*[-–]\s*\d{1,3})?\s*[\]］]"
 _UI_COMPOUND_RE = re.compile(r"编辑播报|播报编辑|编辑语音|语音编辑|播报语音")
 _UI_EDGE_RE = re.compile(r"^(?:(?:播报|编辑|语音)(?:\s+|$))+|(?:(?:^|\s+)(?:播报|编辑|语音))+$")
 _TRAILER_RE = re.compile(r"\s*zhua曲子白渡白颗\s*$")
-# Gallery captions that leak into scraped text: "剧照(80张)", "合并图册(2张)"
-_CAPTION_RE = re.compile(r"[^\s，。；：、！？]{0,12}[（(]\d{1,3}张[)）]")
+# Gallery captions that leak into scraped text: "剧照(80张)", "合并图册(2张)".
+# The marker is certain; where the caption before it starts is not.
+_CAPTION_MARK_RE = re.compile(r"[（(]\d{1,3}张[)）]")
+_CAPTION_BOUNDARY = "，。；：、！？"
+_CAPTION_WORDS = ("图册", "剧照", "照片", "图片", "写真", "近照", "新照", "旧照", "海报", "封面", "图集",
+                  "相册", "截图", "定妆照", "概述图", "风光", "景色", "风景")
+_CAPTION_WINDOW = 12
 _WS_RE = re.compile(r"[\s\u00a0\u2000-\u200b\u3000\ufeff]+")
 # A single space between two CJK characters/punctuation marks is never
 # meaningful in Chinese prose.
@@ -25,17 +30,30 @@ _CJK_SPACE_RE = re.compile(
     rf"(?<=[{_CJK}]) (?=[{_CJK}])|(?<=[{_CJK_PUNCT}]) | (?=[。！？；，、：”’）》】])")
 _SENTENCE_END = "。！？；"
 _CJK_CHAR_RE = re.compile(r"[\u4e00-\u9fff]")
-# Infobox-style lines: "\u4f5c\u8005\uff1a\u5f90\u6c49\u6797\u7f16\u8457", "I S B N\uff1a9787801383617", "\u00b7ISBN\uff1a7532120198"
-_KEY_VALUE_LINE_RE = re.compile(r"^\s*[\u00b7\u2022\-\u3010\[]?\s*[^\uff1a:\uff0c\u3002\uff1b\uff01\uff1f\n]{1,12}[\u3011\]]?\s*[\uff1a:]")
+# Infobox-style lines: "作者：徐汉林编著", "I S B N：9787801383617", "·ISBN：7532120198"
+_KEY_VALUE_LINE_RE = re.compile(r"^\s*[·•\-【\[]?\s*(?P<key>[^：:，。；！？\n]{1,12})[】\]]?\s*(?P<colon>[：:])")
+_OPEN_QUOTES = "“‘「『\""
+_SPEECH_KEY_RE = re.compile(r"(?:曰|说|道|云|问|答|称|言|谓|载|讲|喊|叫|唱|写|想|指出|表示|认为)$")
+# Lines whose value is the definition itself: "解释：表示纵情山水、逍遥遨游。", "【释义】…"
+_DEFINITION_KEY = r"(?:基本|词语|成语|词目|汉语|详细|中文)?(?:解释|释义|释意|词义|含义|意思|定义)|简介|概述"
+_DEFINITION_LINE_RE = re.compile(
+    r"^\s*(?:[【\[〖](?:%s)[】\]〗]\s*[：:]?|[·•\-]?\s*(?:%s)\s*[：:])\s*(?P<value>\S.*)$" % (_DEFINITION_KEY, _DEFINITION_KEY),
+    re.S)
+MIN_DEFINITION_CHARS = 4
+# What is left of a pinyin-only line once the title and these labels are removed
+_STUB_WORDS = ("成语发音", "成语读音", "汉语拼音", "基本信息", "拼音", "注音", "读音", "发音", "音标",
+               "词目", "词语", "词汇", "成语", "名称", "中文名", "汉语", "汉字", "简体", "繁体")
 
 
 def strip_citations(text: str) -> str:
     return _CITATION_RE.sub("", text)
 
 
-def strip_ui_labels(text: str) -> str:
+def strip_ui_labels(text: str, title: str | None = None) -> str:
+    """Remove leaked interface labels. A compound that is part of the article's
+    own title is prose, not a label: 语音编辑器是一种… must not lose 语音编辑."""
     text = _TRAILER_RE.sub("", text)
-    text = _UI_COMPOUND_RE.sub("", text)
+    text = _UI_COMPOUND_RE.sub(lambda m: m.group(0) if title and m.group(0) in title else "", text)
     return _UI_EDGE_RE.sub("", text)
 
 
@@ -44,16 +62,66 @@ def normalize_whitespace(text: str) -> str:
     return _CJK_SPACE_RE.sub("", text)
 
 
-def clean_text(text: str | None) -> str:
-    """Full cleaning pass used for summaries, labels and titles."""
+def _caption_start(before: str, title: str | None, at_text_start: bool) -> int | None:
+    """Where the caption that ends `before` begins, or None when the text in
+    front of a "(N张)" marker does not look like a caption at all. `before`
+    starts at the beginning of the text or right after the previous marker."""
+    start = len(before)
+    while start > 0 and not before[start - 1].isspace() and before[start - 1] not in _CAPTION_BOUNDARY:
+        start -= 1
+    run = len(before) - start
+    if title and len(title) >= 2:
+        # Captions are usually the article title plus a word: 杨念融2013新照(12张)
+        lo = max(start, len(before) - 30)
+        for k in range(len(title), 1, -1):
+            at = before.rfind(title[:k], lo)
+            if at >= 0:
+                return at
+    if run == 0:
+        return len(before)
+    spaced = at_text_start if start == 0 else before[start - 1].isspace()
+    if run <= _CAPTION_WINDOW and spaced:
+        return start
+    if before.endswith(_CAPTION_WORDS):
+        return max(start, len(before) - _CAPTION_WINDOW)
+    return None  # prose such as 四种花色（52张）: leave it alone
+
+
+def strip_captions(text: str, title: str | None = None) -> str:
+    """Remove leaked gallery captions. A caption glued into the middle of a
+    sentence is cut from the article title onwards when the title is in it
+    (塔围长21.6荆山皇帝陵景色(20张)米 -> 塔围长21.6米)."""
+    out: list[str] = []
+    pos = 0
+    for m in _CAPTION_MARK_RE.finditer(text):
+        before = text[pos:m.start()]
+        cut = _caption_start(before, title, pos == 0)
+        out.append(before + m.group(0) if cut is None else before[:cut])
+        pos = m.end()
+    out.append(text[pos:])
+    return "".join(out)
+
+
+def clean_text(text: str | None, title: str | None = None) -> str:
+    """Full cleaning pass for body text (summaries, paragraphs). `title` is
+    the article title, used to find where a leaked caption starts."""
     if not text:
         return ""
     text = text.replace("\\n", "\n")  # literal backslash-n sequences in 563w
     text = strip_citations(text)
-    text = _CAPTION_RE.sub("", text)
-    text = strip_ui_labels(text)
+    text = strip_captions(text, title)
+    text = strip_ui_labels(text, title)
     text = normalize_whitespace(text)
-    return strip_ui_labels(text).strip()
+    return strip_ui_labels(text, title).strip()
+
+
+def clean_title(text: str | None) -> str:
+    """Headwords and sense labels: whitespace only. The UI-label, caption and
+    citation rules are for body text; on a title they erase the headwords
+    编辑, 语音 and 播报 and turn 语音编辑器 into 器."""
+    if not text:
+        return ""
+    return normalize_whitespace(text.replace("\\n", "\n"))
 
 
 def trim_summary(text: str, max_chars: int) -> str:
@@ -109,14 +177,75 @@ def has_cjk(text: str) -> bool:
 
 def is_key_value_line(text: str) -> bool:
     """A single infobox-style 'key：value' line (a short key before the first
-    colon).  Such lines are never a usable summary even when long enough."""
-    return bool(_KEY_VALUE_LINE_RE.match(text))
+    colon).  Such lines are never a usable summary even when long enough.
+    Not counted: a time or ratio (下午3:00, 按1:1), and reported speech
+    (子曰：“学而时习之…”)."""
+    m = _KEY_VALUE_LINE_RE.match(text)
+    if not m:
+        return False
+    key = m.group("key").strip()
+    after = text[m.end():].lstrip()[:1]
+    if key[-1:].isdigit() and after.isdigit():
+        return False
+    if after and after in _OPEN_QUOTES and _SPEECH_KEY_RE.search(key):
+        return False
+    if any(key.count(a) > key.count(b) for a, b in _PAIRS):
+        return False  # the colon is inside a bracket: 粉虱科（学名：Aleyrodidae）是…, 《丁丁历险记：独角兽的秘密》是…
+    return True
 
 
-def is_summary_candidate(text: str) -> bool:
+def key_of(text: str) -> str | None:
+    """The key of an infobox-style line, or None when the line is not one."""
+    return _KEY_VALUE_LINE_RE.match(text).group("key").strip() if is_key_value_line(text) else None
+
+
+def definition_value(text: str) -> str | None:
+    """The value of a line whose key says it is the definition (解释, 释义,
+    词义, 含义, 定义, 简介 …), or None. Such a line is the best summary a
+    dictionary-style page has, although it looks like an infobox line."""
+    m = _DEFINITION_LINE_RE.match(text)
+    if not m:
+        return None
+    value = m.group("value").strip()
+    return value if len(value) >= MIN_DEFINITION_CHARS and has_cjk(value) else None
+
+
+_TONE_LETTER_RE = re.compile(r"[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜńňǹ]")
+_BOPOMOFO_RE = re.compile(r"[ㄅ-ㄯ]")
+_FOREIGN_WORD_RE = re.compile(r"[A-Za-z]{3,}")
+_LATIN_WORD_RE = re.compile(r"[^\W\d_\u2e80-\u9fff\u3100-\u312f]+")
+
+
+def says_nothing(text: str, title: str) -> bool:
+    """True when a line holds nothing beyond the title, its pinyin or
+    bopomofo, and labels such as 拼音/注音 (旗幅 -> "qí fú ㄑㄧˊ ㄈㄨˊ 旗幅",
+    亘古通今 -> "成语发音：gèn gǔ tōng jīn"). The reading field already shows
+    that. A foreign name is something: 刺鱼目（Gasterosteiformes） stays."""
+    rest = text.replace(title, "") if title else text
+    for word in _STUB_WORDS:
+        rest = rest.replace(word, "")
+    if len(_CJK_CHAR_RE.findall(rest)) >= 2:
+        return False
+    if _BOPOMOFO_RE.search(rest):
+        return True
+    # Pinyin is written in lower case with about one tone mark per character
+    # of the title. Accents in capitalised words are a foreign name:
+    # 安得烈·德·涅西亚(André-Robert … de Nerciat), 何塞·马蒂（José Martí）.
+    marks = sum(len(_TONE_LETTER_RE.findall(w)) for w in _LATIN_WORD_RE.findall(rest) if w == w.lower())
+    if marks >= max(1, len(_CJK_CHAR_RE.findall(title or "")) - 1):
+        return True
+    return not _FOREIGN_WORD_RE.search(rest)
+
+
+def is_summary_candidate(text: str, title: str | None = None) -> bool:
     """A cleaned paragraph that can stand in for a missing summary: long
-    enough, contains Chinese, and is not an infobox line."""
-    return summary_drop_reason(text) is None and has_cjk(text) and not is_key_value_line(text)
+    enough, says something in Chinese, and is not an infobox line."""
+    if summary_drop_reason(text) is not None or not has_cjk(text):
+        return False
+    key = key_of(text)
+    if key is not None and not (title and key == title):  # "陈灿：影视演员，…" describes the title
+        return False
+    return not (title and says_nothing(text, title))
 
 
 MIN_SHORT_SENTENCE_CHARS = 6
@@ -158,4 +287,63 @@ def title_drop_reason(title: str) -> str | None:
 def summary_drop_reason(summary: str) -> str | None:
     if len(summary) < MIN_SUMMARY_CHARS:
         return "summary_too_short"
+    return None
+
+
+# --- comparing two summaries --------------------------------------------------
+
+_SIMILARITY_STRIP_RE = re.compile(r"[\s\W_]+")
+SAME_ARTICLE = 0.5   # share of bigrams above which two summaries are one article
+
+
+def _bigrams(text: str, title: str, limit: int) -> set[str]:
+    if title:
+        text = text.replace(title, "")
+    t = _SIMILARITY_STRIP_RE.sub("", text)[:limit]
+    return {t[i:i + 2] for i in range(len(t) - 1)}
+
+
+def similarity(a: str, b: str, title: str = "", limit: int = 160) -> float:
+    """How much of the shorter summary is found in the other: the share of
+    its character bigrams (0..1). The title is left out, because every article
+    about 庐山 says 庐山. Two texts of the same article score high even when
+    one is an older or a shortened version; unrelated articles that share a
+    title score near 0."""
+    x, y = _bigrams(a or "", title, limit), _bigrams(b or "", title, limit)
+    if len(x) < 4 or len(y) < 4:
+        return 1.0 if x and x == y else 0.0
+    return len(x & y) / min(len(x), len(y))
+
+
+def cjk_len(text: str) -> int:
+    """Number of Chinese characters: the length of what a text says, without
+    pinyin, English glosses or punctuation."""
+    return len(_CJK_CHAR_RE.findall(text or ""))
+
+
+_PINYIN_LABEL_RE = re.compile(r"^[\s·•\-【\[〖(（]*(?:成语|汉语|词语|中文)?(?:拼音|读音|发音|注音|音标)[】\]〗)）]*\s*(?:是|为)?\s*[：:]?\s*")
+
+
+def has_tone_marks(text: str) -> bool:
+    return bool(_TONE_LETTER_RE.search(text or ""))
+
+
+_PINYIN_LETTERS = "A-Za-zɑɡüÜāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜńňǹ"
+_PINYIN_TEXT_RE = re.compile(f"[{_PINYIN_LETTERS}][{_PINYIN_LETTERS} '’\\-·]*")
+
+
+def pinyin_line_value(line: str, title: str) -> str | None:
+    """The pinyin a line gives for the title: the first run of tone-marked
+    Latin letters after a 拼音/读音/发音/注音 label, or in a line that holds
+    nothing but the title and its pronunciation. None for any other line.
+    (máo běn ㄇㄠˊ ㄅㄣˇ释义：… gives máo běn.)"""
+    if not has_tone_marks(line):
+        return None
+    m = _PINYIN_LABEL_RE.match(line)
+    labelled = bool(m and m.end() > 0 and any(k in line[:m.end()] for k in ("拼音", "读音", "发音", "注音", "音标")))
+    if not labelled and not says_nothing(line, title):
+        return None
+    for run in _PINYIN_TEXT_RE.finditer(line[m.end():] if labelled else line):
+        if has_tone_marks(run.group(0)):
+            return run.group(0).strip(" '’-·")[:80] or None
     return None

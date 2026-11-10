@@ -173,3 +173,114 @@ def test_short_fragments_are_not_joined_into_a_summary():
     rec = convert(raw, collections.Counter(), 300, False)
     assert rec.summary.startswith("(1) 欲言")
     assert "summary_joined_lines" not in rec.quality_flags
+
+
+def test_definition_line_beats_a_later_citation():
+    # 鱼游濠上 (shape of the real row): the 解释 line used to be skipped as an infobox line
+    raw = _row("鱼游濠上", None, [("词语信息", "【词目】鱼游濠上\n【拼音】yú yóu háo shàng\n解释：表示纵情山水、逍遥遨游。\n"
+                                          "出处：《庄子集释》卷六下〈外篇·秋水〉～606～庄子与惠子游于濠梁之上。")])
+    stats = collections.Counter()
+    rec = convert(raw, stats, 300, False)
+    assert rec.summary == "表示纵情山水、逍遥遨游。"
+    assert rec.quality_flags == ["summary_from_section", "summary_from_later_paragraph", "summary_from_definition_line"]
+    # 片刻 was dropped: its only content is a short definition line
+    rec = convert(_row("片刻", None, [("基本信息", "【词目】片刻\n释义：很短的时间；一会儿。")]), collections.Counter(), 300, False)
+    assert rec.summary == "很短的时间；一会儿。"
+
+
+def test_summary_field_that_says_nothing_gives_way_to_the_sections():
+    # 恒风: the summary field holds only pinyin and bopomofo
+    raw = _row("恒风", "héng fēng ㄏㄥˊ ㄈㄥ ㄏㄥˊ ㄈㄥ", [("解释", "恒风是指风向长期不变的风，例如信风和西风带的风。")])
+    stats = collections.Counter()
+    rec = convert(raw, stats, 300, False)
+    assert rec.summary.startswith("恒风是指") and stats["flag:summary_from_section_after_empty_summary"] == 1
+    # nothing better on the page: dropped, with its own reason
+    stats = collections.Counter()
+    assert convert(_row("旗幅", "qí fú ㄑㄧˊ ㄈㄨˊ 旗幅 旗幅", []), stats, 300, False) is None
+    assert stats["drop:summary_not_prose"] == 1
+    # a summary field that looks like an infobox line is kept: replacing it by a section
+    # paragraph made as many entries worse as better on real rows
+    raw = _row("华澳花园", "地址：海沧马青路与兴港路交汇处", [("简介", "华澳花园是位于海沧区的一个住宅小区，共有十二栋楼。")])
+    assert convert(raw, collections.Counter(), 300, False).summary.startswith("地址：")
+    # a definition label in front of the summary is taken off
+    rec = convert(_row("川渟岳峙", "【解释】：指水止不流，山高矗立。比喻人的凝重庄严。", []), collections.Counter(), 300, False)
+    assert rec.summary == "指水止不流，山高矗立。比喻人的凝重庄严。" and rec.quality_flags == []
+
+
+def test_a_colon_inside_brackets_or_after_the_title_is_not_an_infobox_key():
+    assert not is_key_value_line("粉虱科（学名：Aleyrodidae）是同翅目粉虱总科的刺吸式昆虫。")
+    assert not is_key_value_line("《丁丁历险记：独角兽的秘密》是《海盗失宝》的姐妹篇前篇。")
+    assert is_key_value_line("陈灿：影视演员，国际武术全能冠军。")                       # by shape it is one …
+    assert is_summary_candidate("陈灿：影视演员，国际武术全能冠军，师从少林。", "陈灿")   # … but it describes the title
+    assert not is_summary_candidate("陈灿：影视演员，国际武术全能冠军，师从少林。", "别人")
+    raw = _row("粉虱科", None, [("概述", "粉虱科（学名：Aleyrodidae）是同翅目粉虱总科的刺吸式昆虫，两性成虫均有翅。\n粉虱成虫多喜欢产卵在叶背。")])
+    assert convert(raw, collections.Counter(), 300, False).summary.startswith("粉虱科（学名：Aleyrodidae）")
+
+
+def test_short_definition_is_kept_wherever_it_stands():
+    # 远祖: the first paragraph is a label, the definition comes later and is under 15 characters
+    raw = _row("远祖", None, [("词语信息", "【词目】远祖\n【拼音】yuǎn zǔ\n许多代以前的祖先。")])
+    stats = collections.Counter()
+    rec = convert(raw, stats, 300, False)
+    assert rec.summary == "许多代以前的祖先。"
+    assert rec.quality_flags == ["summary_from_section", "summary_from_later_paragraph", "kept_short_sentence"]
+    # also when the summary field is the useless part
+    rec = convert(_row("托卢", "托卢", [("简介", "中药名。即枸杞。")]), collections.Counter(), 300, False)
+    assert rec.summary == "中药名。即枸杞。" and "kept_short_sentence" in rec.quality_flags
+
+
+def test_interface_words_stay_headwords_and_labels_lose_their_colon():
+    rec = convert(_row("编辑", "编辑，是对资料或现成的作品进行整理、加工的工作，也指从事这种工作的人。", []), collections.Counter(), 300, False)
+    assert rec.title == "编辑" and rec.summary.startswith("编辑，是对资料")
+    rec = convert(_row("语音编辑器", "语音编辑器是一种用来对语音文件进行剪辑的软件工具。", []), collections.Counter(), 300, False)
+    assert rec.title == "语音编辑器" and rec.summary.startswith("语音编辑器是")
+    rec = convert(_row("李永赋", "李永赋，男，汉族，云南晋宁人，中共党员，大学学历。", [("云南晋宁县公安局副局长：", "正文")]),
+                  collections.Counter(), 300, False)
+    assert rec.sense_label == "云南晋宁县公安局副局长"
+    for heading in ("现任校长", "曾主持节目", "参演电视剧", "邻近行政区", "年度人物", "所在城市"):
+        rec = convert(_row("某某某", "某某某是一个用来测试义项标签的条目，内容足够长。", [(heading, "正文")]), collections.Counter(), 300, False)
+        assert rec.sense_label == "", heading
+
+
+def test_an_unusable_row_does_not_block_a_later_row_with_the_same_id(tmp_path):
+    import json
+
+    from baike2yomitan.extract_563w import extract
+    from baike2yomitan.records import iter_records
+
+    rows = [_row("某词", "太短", [], lid=10), _row("某词", "这一行有一个足够长的摘要，应该被保留下来。", [], lid=10),
+            _row("某词", "同一个编号的第三行是重复的，应该被丢弃掉。", [], lid=10)]
+    rows[0]["url"] = "http://baike.baidu.com/view/0010.htm"   # zero padding: the same article
+    src = tmp_path / "raw.jsonl"
+    src.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows), encoding="utf-8")
+    stats = extract(str(src), str(tmp_path / "out.jsonl"), progress_every=0)
+    assert [r["summary"][:4] for r in iter_records(str(tmp_path / "out.jsonl"))] == ["这一行有"]
+    assert stats["drop:dup_lemma_id"] == 1 and stats["drop:summary_too_short"] == 1
+
+
+def test_the_pinyin_line_of_a_dictionary_page_is_kept_for_the_reading():
+    from baike2yomitan.readings import Readings
+
+    # 被褐藏辉: the summary is the definition, so the 【拼音】 line has to travel separately
+    raw = _row("被褐藏辉", None, [("词语信息", "【词目】被褐藏辉\n【拼音】pī hè cáng huī\n解释：身穿粗布衣服而怀藏光辉。比喻有才德而不外露。")])
+    stats = collections.Counter()
+    rec = convert(raw, stats, 300, True)
+    assert rec.summary.startswith("身穿粗布衣服") and rec.infobox == [["拼音", "pī hè cáng huī"]]
+    assert stats["flag:pinyin_line_kept"] == 1
+    assert Readings(None, None)(rec.to_dict()) == ("pī hè cáng huī", "article")
+    # a summary field that was only pinyin and gave way to a section paragraph
+    raw = _row("德才兼备", "发音 dé cái jiān bèi", [("释义", "德才兼备是指既有好的思想品质，又有工作的才干和能力。")])
+    rec = convert(raw, collections.Counter(), 300, True)
+    assert rec.summary.startswith("德才兼备是指") and rec.infobox == [["拼音", "dé cái jiān bèi"]]
+    # only the pinyin is kept from the line
+    from baike2yomitan.cleaning import pinyin_line_value
+    assert pinyin_line_value("máo běn ㄇㄠˊ ㄅㄣˇ释义：明藏书家毛晋所刻的书。", "毛本") is None      # a line that also defines
+    assert pinyin_line_value("【拼音】máo běn ㄇㄠˊ ㄅㄣˇ", "毛本") == "máo běn"
+    assert pinyin_line_value("【shàng shāng】", "上殇") == "shàng shāng"
+    assert pinyin_line_value("zhuó bái ㄓㄨㄛˊ ㄅㄞˊ 斫白", "斫白") == "zhuó bái"
+    assert pinyin_line_value("读音为 dài yù", "待遇") == "dài yù" and pinyin_line_value("待遇从优。", "待遇") is None
+    # not needed when the summary states the pinyin itself, and not done without --infobox data
+    raw = _row("自郐以下", None, [("简介", "自郐以下，汉语成语，拼音是zì kuài yǐ xià，比喻其余不值一提。")])
+    assert convert(raw, collections.Counter(), 300, True).infobox is None
+    raw = _row("被褐藏辉", None, [("词语信息", "【拼音】pī hè cáng huī\n解释：身穿粗布衣服而怀藏光辉。")])
+    assert convert(raw, collections.Counter(), 300, False).infobox is None

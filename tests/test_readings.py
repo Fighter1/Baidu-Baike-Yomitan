@@ -119,3 +119,51 @@ def test_build_uses_the_readings(cedict_path, tmp_path):
         assert "CC-CEDICT" in json.loads(zf.read("index.json"))["attribution"]  # CC BY-SA attribution
     assert got == {"不粘锅": "bù zhān guō", "自郐以下": "zì kuài yǐ xià", "红色食品": "hóng sè shí pǐn"}
     assert (stats["reading:cedict"], stats["reading:article"], stats["reading:pypinyin"]) == (1, 1, 1)
+
+
+def test_two_reading_words_take_the_everyday_reading(tmp_path):
+    # CC-CEDICT lists the rare reading first for these; pypinyin's own phrase list knows the common one
+    p = tmp_path / "cedict.txt"
+    p.write_text("明朝 明朝 [ming2 zhao1] /tomorrow morning/\n明朝 明朝 [Ming2 chao2] /Ming Dynasty/\n"
+                 "教授 教授 [jiao1 shou4] /to instruct/\n教授 教授 [jiao4 shou4] /professor/\n", encoding="utf-8")
+    r = Readings(str(p), None)
+    assert r({"title": "明朝", "summary": "明朝（1368年―1644年），是中国历史上一个由汉族建立的王朝。"}) == ("míng cháo", "cedict")
+    assert r({"title": "教授", "summary": "教授，是一种高等教育体系中的职称。"}) == ("jiào shòu", "cedict")
+    # the article's own pinyin still decides when it names one of the readings
+    assert r({"title": "明朝", "summary": "明朝，读音míng zhāo，意思是明天早晨。"})[0] == "míng zhāo"
+    # and a longer title inherits the everyday reading, also from a second Readings object
+    assert r({"title": "明朝三帝秘录", "summary": "一本书。"})[0].startswith("míng cháo")
+    assert Readings(str(p), None)({"title": "终身教授", "summary": "一种职位。"})[0] == "zhōng shēn jiào shòu"
+
+
+def test_guess_keeps_latin_letters_and_digits():
+    r = Readings(None, None)
+    assert r({"title": "Linux高级程序设计", "summary": "一本书。"})[0] == "Linux gāo jí chéng xù shè jì"
+    assert r({"title": "2013年铁路春运", "summary": "一次春运。"})[0].startswith("2013 nián")
+    assert r({"title": "邮政EMS条形码", "summary": "一种条码。"})[0] == "yóu zhèng EMS tiáo xíng mǎ"
+    assert r({"title": "明朝·那些事儿", "summary": "一本书。"})[0].count("·") == 0      # punctuation is dropped
+
+
+def test_overrides_file_may_start_with_a_bom(tmp_path):
+    p = tmp_path / "o.tsv"
+    p.write_bytes("\ufeff不着四六\tbù zháo sì liù\n".encode("utf-8"))
+    assert load_overrides(str(p)) == {"不着四六": "bù zháo sì liù"}
+
+
+def test_stated_pinyin_may_start_with_a_capital_tone_letter():
+    assert stated_pinyin({"title": "安徽", "summary": "安徽省，简称皖（Ān Huī），位于中国华东。"}) == "ān huī"
+
+
+def test_an_article_that_lists_every_reading_does_not_choose_one(tmp_path):
+    p = tmp_path / "cedict.txt"
+    p.write_text("了 了 [le5] /(completed action marker)/\n了 了 [liao3] /to finish/\n了 了 [liao4] /to look afar/\n"
+                 "朝陽 朝阳 [Chao2 yang2] /Chaoyang district/\n朝陽 朝阳 [zhao1 yang2] /morning sun/\n"
+                 "通 通 [tong1] /to go through/\n通 通 [tong4] /classifier for an activity/\n", encoding="utf-8")
+    r = Readings(str(p), None)
+    # a character article gives all its readings; the common one is not the first it mentions
+    assert r({"title": "了", "summary": "了（拼音：liǎo、le），汉语一级通用规范汉字。", "infobox": [["读音", "liǎo（ㄌㄧㄠˇ）le"]]}) == ("le", "cedict")
+    assert r({"title": "通", "summary": "通属于常用字。读tòng时作量词。"}) == ("tōng", "cedict")
+    # a word article that explains both readings leaves the choice to the phrase list
+    assert r({"title": "朝阳", "summary": "朝阳，有两种读法，读cháo yáng时意思是向着太阳。读zhāo yáng时意思是初升的太阳。"})[0] == "zhāo yáng"
+    # one stated reading still decides
+    assert r({"title": "朝阳", "summary": "朝阳（cháo yáng）是北京的一个区。"})[0] == "cháo yáng"

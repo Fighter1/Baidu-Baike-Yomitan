@@ -11,20 +11,29 @@ import time
 import urllib.parse
 from typing import Iterator
 
-from .cleaning import (clean_text, short_summary_keep_reason,
+from .cleaning import (SAME_ARTICLE, clean_text, clean_title, short_summary_keep_reason, similarity,
                        summary_drop_reason, title_drop_reason, trim_summary)
 from .records import Record, RecordWriter
 
 SOURCE = "hf"
 _ITEM_ID_RE = re.compile(r"/item/[^/]+/(\d+)/?$")
-_OBFUSC_RE = re.compile(r"(?:[一-鿿] ){4,}")
+_URL_RESERVED_RE = re.compile(r'[%#?/\s"<>\\]')
+MAX_DESCRIPTOR_CHARS = 60  # per sense of a sense-list page
 _LONE_CJK_RE = re.compile(r"(?<!\S)[一-鿿](?!\S)")
 _CJK_RE = re.compile(r"[一-鿿]")
 _HEADING_RE = re.compile(r"^\s*(?P<title>.{1,40}?)(?:编辑播报|播报编辑|编辑语音|编辑|播报)\s+")
 
 
 def decode_url(url: str | None) -> str:
-    return urllib.parse.unquote(url or "")
+    """Percent-decode the path so the link is readable and short, but leave
+    the characters that mean something in a URL encoded: /item/C%23/195147
+    must not become /item/C#/195147, which is the page for C."""
+    if not url:
+        return ""
+    parts = urllib.parse.urlsplit(url)
+    path = "/".join(_URL_RESERVED_RE.sub(lambda m: "%%%02X" % ord(m.group()), urllib.parse.unquote(seg))
+                    for seg in parts.path.split("/"))
+    return urllib.parse.urlunsplit((parts.scheme, parts.netloc, path, parts.query, ""))
 
 
 def lemma_id_from_item_url(url: str | None) -> int | None:
@@ -37,31 +46,41 @@ def lemma_id_from_item_url(url: str | None) -> int | None:
 
 
 def title_from_url(url: str | None) -> str:
-    path = decode_url(urllib.parse.urlsplit(url or "").path)
-    m = re.match(r"/item/([^/]+)", path)
-    return clean_text(m.group(1)) if m else ""
+    m = re.match(r"/item/([^/]+)", urllib.parse.urlsplit(url or "").path)
+    return clean_title(urllib.parse.unquote(m.group(1))) if m else ""
 
 
 def is_obfuscated(text: str) -> bool:
-    """2024 snapshots spread text as 'X X X X' and mix in junk characters."""
+    """2024 snapshots spread text as 'X X X X' and mix in junk characters.
+
+    Judged by the share of Chinese characters that stand alone between
+    spaces. Across the overlay that share is either near 1 (garbled pages) or
+    under 0.2, so a run of four spaced characters by itself proves nothing: a
+    table header or a list of names (子 璨 玮 琮, 金 木 水 火 土) has one too."""
     if not text:
         return False
-    if _OBFUSC_RE.search(text):
-        return True
     cjk = len(_CJK_RE.findall(text))
-    if cjk < 20:
+    if cjk < 8:
         return False
     lone = len(_LONE_CJK_RE.findall(text))
     return lone / cjk > 0.3
 
 
 def is_disambiguation(text: str, title: str) -> bool:
-    """Pages listing senses as '<title>：<descriptor> <title>：<descriptor> …'."""
+    """Pages listing senses as '<title>：<descriptor> <title>：<descriptor> …'.
+
+    Every part has to be a short descriptor and at least two must differ. An
+    article whose abstract opens with '<title>：' has the same shape at first
+    sight, because the overlay repeats the abstract before the body, but its
+    parts are the abstract twice and the second one runs on into the body."""
     t = text.strip()
     if not t or "：" not in t or not title:
         return False
-    parts = [p for p in re.split(r"\s+(?=" + re.escape(title) + r"：)", t) if p]
-    return len(parts) >= 2 and all(p.startswith(title + "：") for p in parts)
+    parts = [p.strip() for p in re.split(r"\s+(?=" + re.escape(title) + r"：)", t) if p.strip()]
+    if len(parts) < 2 or not all(p.startswith(title + "：") for p in parts):
+        return False
+    longest = len(title) + 1 + MAX_DESCRIPTOR_CHARS
+    return len(set(parts)) >= 2 and all(len(p) <= longest for p in parts)
 
 
 def split_repeated_abstract(content: str) -> str | None:
@@ -137,7 +156,7 @@ def snapshot_date(ts) -> str | None:
 
 
 def convert(row: dict, stats: collections.Counter, max_summary_chars: int) -> Record | None:
-    title = clean_text(row.get("title")) or title_from_url(row.get("base_url"))
+    title = clean_title(row.get("title")) or title_from_url(row.get("base_url"))
     reason = title_drop_reason(title)
     if reason:
         stats["drop:" + reason] += 1
@@ -151,7 +170,7 @@ def convert(row: dict, stats: collections.Counter, max_summary_chars: int) -> Re
     if abstract is None:
         abstract = fallback_abstract(content, title)
         flags.append("abstract_fallback")
-    summary = clean_text(abstract)
+    summary = clean_text(abstract, title)
     if "obfuscated" not in flags:
         reason = summary_drop_reason(summary)
         if reason:
@@ -164,7 +183,7 @@ def convert(row: dict, stats: collections.Counter, max_summary_chars: int) -> Re
     summary = trim_summary(summary, max_summary_chars)
     base_url = row.get("base_url") or row.get("url") or ""
     lemma_id = lemma_id_from_item_url(base_url)
-    subtitle = clean_text(row.get("subtitle")) or ""
+    subtitle = clean_title(row.get("subtitle"))
     if subtitle == title:
         subtitle = ""
     rec = Record(
@@ -194,31 +213,57 @@ def _summary_signature(summary: str) -> str:
 
 
 def _quality(rec: Record) -> tuple:
-    """Lower = better: cleanest first, newest second."""
+    """Lower = better: cleanest first, then one that has a subtitle, then newest."""
     f = rec.quality_flags
     score = (2 if "obfuscated" in f else 0) + (1 if "abstract_fallback" in f else 0)
-    return (score, -(int((rec.snapshot_date or "0000-00-00").replace("-", ""))))
+    return (score, 0 if rec.sense_label else 1, -(int((rec.snapshot_date or "0000-00-00").replace("-", ""))))
+
+
+def _fold(a: Record, b: Record) -> Record:
+    """Two snapshots of one article: keep the better, with whatever the other
+    knows that it lacks (article id, subtitle, having been reached id-less)."""
+    keep, other = (a, b) if _quality(a) <= _quality(b) else (b, a)
+    if keep.lemma_id is None and other.lemma_id is not None:
+        keep.lemma_id, keep.url = other.lemma_id, other.url
+    if not keep.sense_label and other.sense_label:
+        keep.sense_label = other.sense_label
+    keep._idless = getattr(keep, "_idless", False) or getattr(other, "_idless", False)  # type: ignore[attr-defined]
+    return keep
 
 
 def assign_default_senses(records: list[Record]) -> None:
-    """is_default_sense: the sense reached by an id-less URL, else the sense
-    with no subtitle, else the only sense; otherwise False for all."""
+    """is_default_sense is True for the sense that the id-less URL
+    /item/<title> showed, False for the title's other senses, and None for
+    every sense of a title that was never captured through that URL.
+
+    Having no subtitle, or being the only sense captured, says nothing about
+    which sense is the main one: /item/时间/58293344 is a film song without a
+    subtitle, and treating it as the default put it above the word."""
     by_title: dict[str, list[Record]] = collections.defaultdict(list)
     for rec in records:
         by_title[rec.title].append(rec)
     for senses in by_title.values():
-        idless = [r for r in senses if getattr(r, "_idless", False)]
-        nosub = [r for r in senses if not r.sense_label]
-        if idless:
-            default = idless[0]
-        elif nosub:
-            default = nosub[0]
-        elif len(senses) == 1:
-            default = senses[0]
-        else:
-            default = None
+        default = next((r for r in senses if getattr(r, "_idless", False)), None)
         for r in senses:
-            r.is_default_sense = (r is default) if default is not None else False
+            r.is_default_sense = (r is default) if default is not None else None
+
+
+def _same_article(rec: Record, candidates: list[Record], title: str) -> Record | None:
+    """The candidate that is the same article as an id-less snapshot: equal
+    subtitle, or summaries that are mostly the same text."""
+    if rec.sense_label:
+        for o in candidates:
+            if o.sense_label == rec.sense_label:
+                return o
+    sig = _summary_signature(rec.summary)
+    best, best_score = None, SAME_ARTICLE
+    for o in candidates:
+        if _summary_signature(o.summary) == sig:
+            return o
+        score = similarity(rec.summary, o.summary, title)
+        if score >= best_score:
+            best, best_score = o, score
+    return best
 
 
 def extract(path: str, out_path: str, limit: int | None = None,
@@ -233,66 +278,51 @@ def extract(path: str, out_path: str, limit: int | None = None,
         rec = convert(row, stats, max_summary_chars)
         if rec is None:
             continue
-        key = (rec.title, rec.sense_label)
+        # One article = one id. Snapshots without an id can only be told
+        # apart by title and subtitle. (Keying everything on title and
+        # subtitle folded different articles into one: 亨利五世 the king and
+        # 亨利五世 the play have different ids and no subtitle.)
+        key = rec.lemma_id if rec.lemma_id is not None else (rec.title, rec.sense_label)
         cur = best.get(key)
         if cur is None:
             best[key] = rec
         else:
-            stats["dup:title_subtitle"] += 1
-            keep, other = (rec, cur) if _quality(rec) < _quality(cur) else (cur, rec)
-            if keep.lemma_id is None and other.lemma_id is not None:
-                keep.lemma_id = other.lemma_id
-                keep.url = other.url
-            keep._idless = keep._idless or other._idless  # type: ignore[attr-defined]
-            best[key] = keep
+            stats["dup:lemma_id" if rec.lemma_id is not None else "dup:title_subtitle"] += 1
+            best[key] = _fold(rec, cur)
         if progress_every and n % progress_every == 0:
             print(f"  [hf] {n:,} rows, {len(best):,} unique senses, {time.time()-t0:,.0f}s",
                   file=sys.stderr, flush=True)
-    # Secondary dedupe: snapshots of one lemma_id taken before/after Baike
-    # added subtitles produce (title, "") and (title, subtitle) pairs for the
-    # same page.  Keep the one with a subtitle, then the cleanest/newest.
-    by_lemma: dict[int, Record] = {}
-    keep_list: list[Record] = []
-    for rec in best.values():
-        if rec.lemma_id is None:
-            keep_list.append(rec)
-            continue
-        cur = by_lemma.get(rec.lemma_id)
-        if cur is None:
-            by_lemma[rec.lemma_id] = rec
-            continue
-        stats["dup:lemma_id"] += 1
-        better = rec if (bool(rec.sense_label), -_quality(rec)[0], -_quality(rec)[1]) > \
-            (bool(cur.sense_label), -_quality(cur)[0], -_quality(cur)[1]) else cur
-        other = cur if better is rec else rec
-        better._idless = getattr(better, "_idless", False) or getattr(other, "_idless", False)  # type: ignore[attr-defined]
-        by_lemma[rec.lemma_id] = better
-    keep_list.extend(by_lemma.values())
-    # Tertiary dedupe: an id-less, subtitle-less snapshot whose abstract matches
-    # another sense of the same title is that sense's default-sense page.
+    # Second pass: a snapshot taken through the id-less URL shows one of the
+    # title's articles, namely its default sense. Fold it into the article
+    # with an id that has the same subtitle or the same text; that article is
+    # then known to be the default.
     groups: dict[str, list[Record]] = collections.defaultdict(list)
-    for rec in keep_list:
+    for rec in best.values():
         groups[rec.title].append(rec)
-    drop_ids: set[int] = set()
-    for senses in groups.values():
-        if len(senses) < 2:
-            continue
+    keep_list: list[Record] = []
+    for title, senses in groups.items():
+        with_id = [r for r in senses if r.lemma_id is not None]
         for r in senses:
-            if r.lemma_id is None and not r.sense_label:
-                sig = _summary_signature(r.summary)
-                match = next((o for o in senses if o is not r and o.lemma_id is not None
-                              and _summary_signature(o.summary) == sig), None)
-                if match is not None:
-                    match._idless = True  # type: ignore[attr-defined]
-                    drop_ids.add(id(r))
-                    stats["dup:idless_same_summary"] += 1
-    keep_list = [r for r in keep_list if id(r) not in drop_ids]
-    assign_default_senses(keep_list)
-    with RecordWriter(out_path) as w:
-        for rec in keep_list:
-            if "obfuscated" in rec.quality_flags:
-                stats["drop:obfuscated_no_clean_duplicate"] += 1
+            if r.lemma_id is not None:
                 continue
+            match = _same_article(r, with_id, title)
+            if match is None:
+                keep_list.append(r)
+                continue
+            stats["dup:idless_same_summary"] += 1
+            folded = _fold(r, match)
+            folded._idless = True  # type: ignore[attr-defined]
+            with_id[with_id.index(match)] = folded
+        keep_list.extend(with_id)
+    written: list[Record] = []
+    for rec in keep_list:
+        if "obfuscated" in rec.quality_flags:
+            stats["drop:obfuscated_no_clean_duplicate"] += 1
+        else:
+            written.append(rec)
+    assign_default_senses(written)
+    with RecordWriter(out_path) as w:
+        for rec in written:
             for f in rec.quality_flags:
                 stats["flag:" + f] += 1
             if rec.lemma_id is None:

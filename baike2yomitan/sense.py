@@ -53,7 +53,9 @@ _DESCRIPTOR_SUFFIX_RE = re.compile(
 _LEADING_DIGIT_RE = re.compile(r"^\d")
 # "主要景点", "特色景点", "所辖省区", "同名歌曲", "配合…": headings about the
 # entity, not descriptors of it.
-_GENERIC_PREFIX_RE = re.compile(r"^(主要|特色|具体|所辖|所属|设立|同名|配合|相关|其他|其它|各|该|本|此|常见|著名|知名|重要|典型)")
+_GENERIC_PREFIX_RE = re.compile(
+    r"^(主要|特色|具体|所辖|所属|设立|同名|配合|相关|其他|其它|各|该|本|此|常见|著名|知名|重要|典型|"
+    r"现任|历任|曾|参演|主演|出演|演出|邻近|年度|下辖|所在|出品|发行|获得|所获|关于)")
 _YEAR_PREFIX_RE = re.compile(r"^\d{4}年")
 _PUNCT_RE = re.compile(r"[：:，,。、；;！!？?（）()《》【】\[\]\"“”'‘’·…—\-/\|]")
 
@@ -90,15 +92,94 @@ def is_descriptor(section_title: str | None, title: str) -> bool:
     return bool(_DESCRIPTOR_SUFFIX_RE.search(s))
 
 
+# Subtitles that say the article is the word itself: 汉语词汇, 汉字, 成语, 词语解释
+_WORD_LABEL_RE = re.compile(
+    r"^(?:汉语|中文|现代汉语|古代汉语)?(?:常用|通用|一级|二级)?"
+    r"(?:词语|词汇|汉字|成语|字词|文字|单字|熟语|俗语|惯用语|名词|动词|形容词|副词|量词|连词|介词|助词|代词|叹词|字)"
+    r"(?:解释|释义)?$")
+# Subtitles that name a work: 张学友演唱歌曲, 2021年上映的纪录电影, 张爱玲创作的小说
+_WORK_LABEL_RE = re.compile(
+    r"歌曲|单曲|专辑|插曲|主题曲|片尾曲|片头曲|电影|影片|电视剧|网剧|剧集|纪录片|动画|动漫|漫画|小说|图书|书籍|"
+    r"著作|杂志|期刊|节目|综艺|游戏|话剧|歌剧|舞剧|音乐剧|戏剧|诗作|诗歌|诗词|散文|绘本|画作|雕塑|"
+    r"演唱|执导|出版社出版|作品$")
+_CERTAIN_PERSON = r"[，,（(]\s*[男女]\s*[，,）)。]|\d{4}年(?:\d{1,2}月)?(?:\d{1,2}日)?(?:出生|生)|出生于|生于\d"
+_CERTAIN_PERSON_RE = re.compile(_CERTAIN_PERSON)
+_PERSON_RE = re.compile(
+    _CERTAIN_PERSON + "|"
+    r"[（(][^（()）]{0,10}(?:\d{3,4}|[?？])\s*年?[^（()）]{0,12}[—－\-~～–至][^（()）]{0,16}[）)]|"   # 王都（？—929年）
+    r"[，,]\s*(?:原名|本名|字|号|谥号)[^，,。；]{1,6}[，,。；]")
+_YEAR_RE = re.compile(r"(?<!\d)(?:1\d{3}|20\d{2})(?!\d)")
+
+
+# "沧海一粟，汉语成语，读音是…", "说明是一个汉语词汇，…", "英，汉语常用字（一级字），…"
+_WORD_SUMMARY_RE = re.compile(r"(?:汉语|中文)(?:成语|词语|词汇|汉字|字词|熟语|俗语)|汉语(?:常用|通用|[一二三]级)(?:规范)?(?:汉)?字")
+
+
+def is_work(rec: dict) -> bool:
+    """A song, film, book, game …: the subtitle says so, or the summary opens
+    with the title in 《》 (also after a few words: 同名电视剧《沧海一粟》…)."""
+    title = rec.get("title") or ""
+    if _WORK_LABEL_RE.search(rec.get("sense_label") or ""):
+        return True
+    opening = (rec.get("summary") or "").lstrip()[:len(title) + 10]
+    return bool(title) and ("《" + title + "》" in opening or opening.startswith("「" + title + "」"))
+
+
+def is_word(rec: dict) -> bool:
+    """The article about the word or character itself: the subtitle says so
+    (汉语词汇, 汉字 …), or the summary introduces the title as one
+    (沧海一粟，汉语成语，…) and the article is not a work."""
+    if _WORD_LABEL_RE.match((rec.get("sense_label") or "").strip()):
+        return True
+    title = rec.get("title") or ""
+    opening = (rec.get("summary") or "").lstrip()[:len(title) + 24]
+    return bool(_WORD_SUMMARY_RE.search(opening)) and not is_work(rec)
+
+
+def is_person(rec: dict, certain: bool = False) -> bool:
+    """A biography, going by the opening of the summary: ，男，/ 1968年1月出生,
+    and unless `certain` also a year range in brackets or a courtesy name
+    (（487~593）/ ，字明允，). The second group is right for people and wrong
+    for dynasties and wars (后汉（947年—950年）), so it suits a guard that only
+    has to err on the safe side, not a statement that the article is a
+    person."""
+    return bool((_CERTAIN_PERSON_RE if certain else _PERSON_RE).search((rec.get("summary") or "")[:80]))
+
+
+def share_a_year(a: dict, b: dict) -> bool:
+    """Both summaries name the same year (of birth, mostly): the one cheap
+    sign that two biographies under one name are the same person."""
+    return bool(set(_YEAR_RE.findall(a.get("summary") or "")) & set(_YEAR_RE.findall(b.get("summary") or "")))
+
+
+_ORGANISATION_RE = re.compile(
+    r"有限公司|有限责任公司|股份公司|集团公司|(?:公司|企业|集团|学校|学院|大学|中学|小学|幼儿园)"
+    r"(?:成立|创办|创建|创立|始建|位于|坐落|地处|是一[家所间])|(?:成立|创办|创建|创立|始建)于")
+
+
+def is_organisation(rec: dict) -> bool:
+    """A company or a school, going by the opening of the summary."""
+    return bool(_ORGANISATION_RE.search((rec.get("summary") or "")[:80]))
+
+
 def sense_rank_key(rec: dict) -> tuple:
-    """Sort key for senses sharing a title: default/real-summary senses first,
-    then lower lemma_id.  Lower key = better."""
+    """Sort key for senses sharing a title.  Lower key = better.
+
+    1. the sense Baike itself shows for the bare title (reached by an id-less
+       URL), when that is known;
+    2. the word before other articles, and works (songs, films, books named
+       after the word) last: someone looking up 时间 wants the word, not one
+       of the songs called 时间;
+    3. a real abstract before a fallback paragraph;
+    4. the lower article id."""
     default = rec.get("is_default_sense")
     flags = rec.get("quality_flags") or []
     real_summary = not any(f in ("summary_from_section", "abstract_fallback") for f in flags)
     lemma = rec.get("lemma_id")
+    kind = 0 if is_word(rec) else 2 if is_work(rec) else 1
     return (
         0 if default is True else 1,
+        kind,
         0 if real_summary else 1,
         lemma if isinstance(lemma, int) else 10**12,
     )

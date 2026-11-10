@@ -1,35 +1,71 @@
 # Extract report
 
-Generated 2026-11-10 00:33.
+Generated 2026-11-10 05:16.
+
+## audit_baike-full
+| metric | value |
+|---|---:|
+| golden_checks | 40 |
+| headwords | 4,795,093 |
+| headwords_whose_first_sense_is_a_work | 267,980 |
+| headwords_with_a_repeated_sense | 125 |
+| headwords_with_a_work_above_another_sense | 2,196 |
+| headwords_with_several_senses | 46,890 |
+| of_those_without_a_label | 74,527 |
+| rows | 8,813,748 |
+| scope | full |
+| senses | 4,872,771 |
+| senses_of_headwords_with_several | 124,568 |
+| senses_without_a_reading | 148,116 |
+| summaries_cut_inside_a_quote | 8,149 |
+| summaries_starting_mid_list | 14,403 |
+| summaries_that_say_nothing | 386 |
+
+## audit_baike-lexical
+| metric | value |
+|---|---:|
+| golden_checks | 34 |
+| headwords | 81,843 |
+| headwords_whose_first_sense_is_a_work | 1,879 |
+| headwords_with_a_work_above_another_sense | 62 |
+| headwords_with_several_senses | 11,894 |
+| of_those_without_a_label | 16,939 |
+| rows | 167,014 |
+| scope | lexical |
+| senses | 104,436 |
+| senses_of_headwords_with_several | 34,487 |
+| summaries_cut_inside_a_quote | 129 |
+| summaries_starting_mid_list | 396 |
+| summaries_that_say_nothing | 71 |
 
 ## build_baike-full
 | metric | value |
 |---|---:|
-| entries | 8,817,011 |
-| entries_traditional | 3,928,236 |
-| records_seen | 4,888,775 |
-| seconds | 497 |
+| entries | 8,813,748 |
+| entries_traditional | 3,940,977 |
+| records_seen | 4,872,771 |
+| seconds | 765 |
 | term_banks | 882 |
-| titles_with_multiple_senses | 32,691 |
-| zip_bytes | 1,304,878,255 |
+| titles_with_multiple_senses | 46,890 |
+| zip_bytes | 1,412,303,542 |
 
 ## build_baike-lexical
 | metric | value |
 |---|---:|
-| entries | 159,702 |
-| entries_traditional | 60,785 |
-| records_seen | 4,888,775 |
-| seconds | 44 |
-| term_banks | 16 |
-| titles_with_multiple_senses | 32,691 |
-| zip_bytes | 25,112,386 |
+| entries | 167,014 |
+| entries_traditional | 62,578 |
+| records_seen | 4,872,771 |
+| seconds | 105 |
+| term_banks | 17 |
+| titles_with_multiple_senses | 46,890 |
+| zip_bytes | 28,284,161 |
 
 **Skipped at build**
 
 | reason | count |
 |---|---:|
-| excluded_tag | 3,832 |
-| not_in_cedict | 4,786,026 |
+| excluded_tag | 2,167 |
+| not_in_cedict | 4,766,168 |
 
 ## build_ci-smoke
 | metric | value |
@@ -45,8 +81,8 @@ Generated 2026-11-10 00:33.
 | metric | value |
 |---|---:|
 | cedict_headwords | 121,612 |
-| lexical_entries_after_tag_exclusion | 159,702 |
-| records_with_cedict_title | 102,749 |
+| lexical_entries_after_tag_exclusion | 167,026 |
+| records_with_cedict_title | 106,603 |
 
 ## extract_563w
 | metric | value |
@@ -54,85 +90,90 @@ Generated 2026-11-10 00:33.
 | input | data\raw\563w\563w_baidubaike.json |
 | input_rows | 5,634,898 |
 | output | data\records.jsonl |
-| records_written | 4,716,938 |
-| seconds | 761 |
+| records_written | 4,674,224 |
+| seconds | 743 |
 
 **Drops by reason**
 
 | reason | count |
 |---|---:|
-| dup_lemma_id | 244 |
-| dup_title_summary | 371 |
-| no_summary_no_sections | 208,407 |
-| summary_not_prose_fallback | 70,771 |
-| summary_too_short | 471,888 |
-| summary_too_short_fallback | 150,309 |
-| title_empty | 13 |
+| dup_lemma_id | 238 |
+| dup_title_summary | 367 |
+| no_summary_no_sections | 208,408 |
+| summary_not_prose | 73,731 |
+| summary_not_prose_fallback | 50,662 |
+| summary_too_short | 470,813 |
+| summary_too_short_fallback | 140,489 |
+| title_empty | 9 |
 | title_too_long | 15,957 |
 
 **Quality flags on kept records**
 
 | reason | count |
 |---|---:|
-| kept_alias_line | 154 |
-| kept_short_sentence | 11,075 |
-| sense_label_from_section | 40,651 |
-| summary_from_later_paragraph | 1,343,535 |
-| summary_from_section | 2,675,004 |
-| summary_from_section_after_short_summary | 60,128 |
-| summary_joined_lines | 918 |
+| kept_alias_line | 556 |
+| kept_short_sentence | 16,262 |
+| pinyin_line_kept | 73,039 |
+| sense_label_from_section | 40,121 |
+| summary_from_definition_line | 16,860 |
+| summary_from_later_paragraph | 1,371,206 |
+| summary_from_section | 2,708,066 |
+| summary_from_section_after_empty_summary | 2,170 |
+| summary_from_section_after_short_summary | 60,930 |
+| summary_joined_lines | 919 |
 
 ## extract_hf
 | metric | value |
 |---|---:|
-| default_senses | 340,016 |
+| default_senses | 142,457 |
 | input | data\raw\overlay |
 | input_rows | 587,819 |
 | output | data\records.hf.jsonl |
-| records_written | 382,823 |
-| seconds | 512 |
+| records_written | 401,223 |
+| seconds | 427 |
 
 **Drops by reason**
 
 | reason | count |
 |---|---:|
-| disambiguation_page | 29,741 |
-| obfuscated_no_clean_duplicate | 44,353 |
-| summary_too_short | 740 |
-| summary_too_short_fallback | 608 |
-| title_empty | 6 |
+| disambiguation_page | 26,779 |
+| obfuscated_no_clean_duplicate | 45,704 |
+| summary_too_short | 773 |
+| summary_too_short_fallback | 681 |
 | title_too_long | 265 |
 
 **Quality flags on kept records**
 
 | reason | count |
 |---|---:|
-| abstract_fallback | 21,357 |
-| kept_short_sentence | 4,020 |
-| no_lemma_id | 46,862 |
+| abstract_fallback | 23,406 |
+| kept_short_sentence | 4,352 |
+| no_lemma_id | 42,389 |
 
 **Duplicates folded**
 
 | reason | count |
 |---|---:|
-| idless_same_summary | 6,486 |
-| lemma_id | 4,252 |
-| title_subtitle | 118,545 |
+| idless_same_summary | 101,293 |
+| lemma_id | 8,272 |
+| title_subtitle | 2,829 |
 
 ## merge
 | metric | value |
 |---|---:|
-| added | 171,837 |
-| added_extra_sense_of_known_title | 52,927 |
-| added_new_title | 118,910 |
+| added | 198,547 |
+| added_extra_sense_of_known_title | 74,650 |
+| added_new_title | 123,897 |
+| kept_primary | 51,944 |
 | key | title |
-| overlay_records | 382,823 |
-| primary_records | 4,716,938 |
-| records_written | 4,888,775 |
-| refreshed | 210,986 |
-| skipped | 19,171 |
-| skipped_overlay_ambiguous_or_unclean | 19,103 |
-| skipped_primary_title_ambiguous | 68 |
+| overlay_records | 401,223 |
+| primary_records | 4,674,224 |
+| records_written | 4,872,771 |
+| refreshed | 178,963 |
+| skipped | 75,723 |
+| skipped_primary_title_ambiguous | 66 |
+| skipped_repeated_sense | 2,757 |
+| skipped_weak_sense_of_known_title | 20,956 |
 
 ## Source inspection: deviations from the task description
 

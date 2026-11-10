@@ -1,4 +1,4 @@
-"""python -m baike2yomitan extract|merge|build|validate|smoke|sample|release|all"""
+"""python -m baike2yomitan extract|merge|build|validate|audit|smoke|sample|release|all"""
 from __future__ import annotations
 
 import argparse
@@ -95,7 +95,7 @@ def _readings_cedict(a, fallback=None):
     return path
 
 
-def _build_one(records, out, a, cedict_words=None, exclude_tags=None, readings_cedict=None):
+def _build_one(records, out, a, cedict_words=None, exclude_tags=None, readings_cedict=None, common_words=None):
     """Build one zip. The title is --title (build only) or, absent that, derived
     by build() from whether a CC-CEDICT filter is in play."""
     from .build import build
@@ -108,6 +108,7 @@ def _build_one(records, out, a, cedict_words=None, exclude_tags=None, readings_c
         update_base_url = github_release_base_url(repo_from_git_remote())
     stats = build(records, out, title=getattr(a, "title", None), pinyin=a.pinyin, traditional=a.traditional,
                   infobox=a.infobox, cedict_words=cedict_words, exclude_tags=exclude_tags,
+                  common_words=common_words,
                   revision=a.revision, update_base_url=update_base_url,
                   readings_cedict=readings_cedict)
     save_stats("build_" + os.path.splitext(os.path.basename(out))[0], stats)
@@ -116,17 +117,19 @@ def _build_one(records, out, a, cedict_words=None, exclude_tags=None, readings_c
 
 
 def cmd_build(a) -> int:
-    cedict_words = None
+    cedict_words = common_words = None
     if a.cedict:
-        from .cedict import load_simplified_headwords
+        from .cedict import load_common_headwords, load_simplified_headwords
 
         cedict_words = load_simplified_headwords(a.cedict)
-        print(f"CC-CEDICT simplified headwords: {len(cedict_words):,}")
+        common_words = load_common_headwords(a.cedict)
+        print(f"CC-CEDICT simplified headwords: {len(cedict_words):,} ({len(common_words):,} ordinary words)")
     exclude = set(t for t in (a.exclude_tags or "").split(",") if t)
-    _build_one(a.records, a.out, a, cedict_words, exclude, _readings_cedict(a, fallback=a.cedict))
+    _build_one(a.records, a.out, a, cedict_words, exclude, _readings_cedict(a, fallback=a.cedict), common_words)
     if not a.no_validate:
         return cmd_validate(argparse.Namespace(zip=a.out, schemas_dir=a.schemas_dir, engine="auto",
-                                               validate_workers=a.validate_workers))
+                                               validate_workers=a.validate_workers,
+                                               validate_mode=a.validate_mode))
     return 0
 
 
@@ -134,7 +137,7 @@ def cmd_validate(a) -> int:
     from .validate import validate_zip
 
     errors = validate_zip(a.zip, a.schemas_dir, engine=getattr(a, "engine", "auto"),
-                          workers=getattr(a, "validate_workers", None))
+                          workers=getattr(a, "validate_workers", None), mode=getattr(a, "validate_mode", "shape"))
     if errors:
         print(f"VALIDATION FAILED for {a.zip}: {len(errors)} error(s)")
         for e in errors:
@@ -201,19 +204,68 @@ def cmd_inputs(a) -> int:
         return 2
 
 
+_VALIDATE_MODE_HELP = ("shape (default): check each distinct entry structure against the schema once, plus "
+                       "three whole term banks; full: run the schema over every entry (much slower)")
+
+
+def _workers_arg(value: str) -> int:
+    n = int(value)
+    if n < 1:
+        raise argparse.ArgumentTypeError("must be 1 or more")
+    return n
+
+
+def cmd_audit(a) -> int:
+    """Quality rates and golden-word checks for built zips; 1 when a golden check fails."""
+    from .audit import GOLDEN_PATH, audit, format_report, load_golden
+    from .report import save_stats
+
+    golden = []
+    if not a.no_golden:
+        path = a.golden or GOLDEN_PATH
+        if not os.path.exists(path):
+            print(f"audit: {path} does not exist (pass --golden PATH or --no-golden)", file=sys.stderr)
+            return 2
+        try:
+            golden = load_golden(path)
+        except ValueError as e:
+            print(f"audit: {e}", file=sys.stderr)
+            return 2
+    rc = 0
+    for z in a.zips:
+        stats, failures = audit(z, golden, workers=getattr(a, "workers", None))
+        print(f"\n== audit {z} ==\n" + format_report(stats, failures))
+        save_stats("audit_" + os.path.splitext(os.path.basename(z))[0], stats)
+        if failures:
+            rc = 1
+    if rc:
+        print("\nAUDIT FAILED: a golden word no longer looks the way it should (see FAILED lines above)")
+    return rc
+
+
+def _revision_arg(value: str) -> str:
+    """argparse type: reject a bad --revision before any work starts."""
+    from .build import check_revision
+
+    try:
+        return check_revision(value)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(str(e)) from None
+
+
 def cmd_release(a) -> int:
     from .release import ReleaseError, release
 
     try:
         return release(a.zips, repo=a.repo, tag=a.tag, title=a.title, notes_file=a.notes_file,
-                       draft=a.draft, dry_run=a.dry_run)
+                       draft=a.draft, dry_run=a.dry_run, target=a.target)
     except ReleaseError as e:
         print(f"release: {e}", file=sys.stderr)
         return 2
 
 
 def cmd_all(a) -> int:
-    from .cedict import DEFAULT_PATH, download, load_simplified_headwords
+    from .cedict import DEFAULT_PATH, download, load_common_headwords, load_simplified_headwords
     from .report import save_stats, write_report
     from .validate import print_smoke, smoke
 
@@ -236,14 +288,15 @@ def cmd_all(a) -> int:
     exclude = set(t for t in (a.exclude_tags or "").split(",") if t)
     readings_cedict = _readings_cedict(a, fallback=cedict_path)
     _build_one(records, DIST_FULL, a, readings_cedict=readings_cedict)
-    lex = _build_one(records, DIST_LEX, a, words, exclude, readings_cedict)
+    lex = _build_one(records, DIST_LEX, a, words, exclude, readings_cedict, load_common_headwords(cedict_path))
     rc = 0
     for z in (DIST_FULL, DIST_LEX):
         if getattr(a, "no_validate", False):
             print(f"validation skipped for {z} (--no-validate)")
         else:
             rc |= cmd_validate(argparse.Namespace(zip=z, schemas_dir=a.schemas_dir, engine="auto",
-                                                  validate_workers=a.validate_workers))
+                                                  validate_workers=a.validate_workers,
+                                               validate_mode=a.validate_mode))
     inter = lex["records_seen"] - lex.get("skip:not_in_cedict", 0)
     save_stats("cedict", {"cedict_headwords": len(words), "records_with_cedict_title": inter,
                           "lexical_entries_after_tag_exclusion": lex["entries"]})
@@ -252,6 +305,11 @@ def cmd_all(a) -> int:
     print("\n== smoke test (full) ==")
     ok = print_smoke(smoke(DIST_FULL, extra_random=5, seed=a.seed))
     cmd_sample(argparse.Namespace(records=records, n=20, seed=a.seed))
+    if getattr(a, "no_audit", False):
+        print("audit skipped (--no-audit)")
+    else:
+        rc |= cmd_audit(argparse.Namespace(zips=[DIST_FULL, DIST_LEX], golden=a.golden, no_golden=False,
+                                           workers=a.validate_workers))
     return rc or (0 if ok else 1)
 
 
@@ -281,11 +339,12 @@ def main(argv=None) -> int:
         sp.add_argument("--infobox", action="store_true", help="render 基本信息 pairs below the summary")
         sp.add_argument("--exclude-tags", default="", help="comma-separated Baike tags to drop (lexical build)")
         sp.add_argument("--schemas-dir", default=os.path.join("data", "schemas"))
-        sp.add_argument("--validate-workers", type=int, default=None, metavar="N",
+        sp.add_argument("--validate-workers", type=_workers_arg, default=None, metavar="N",
                         help="processes for the schema check (default: every core)")
+        sp.add_argument("--validate-mode", choices=["shape", "full"], default="shape", help=_VALIDATE_MODE_HELP)
         sp.add_argument("--seed", type=int, default=None)
-        sp.add_argument("--revision", default=None,
-                        help="index.json revision, dot-separated integers (default: today as Y.M.D)")
+        sp.add_argument("--revision", default=None, type=_revision_arg,
+                        help="index.json revision, four dot-separated integers (default: today as Y.M.D.1)")
         sp.add_argument("--update-url", default=None, metavar="BASE_URL|github",
                         help="make the dictionary self-updating: index.json gets isUpdatable plus "
                              "indexUrl/downloadUrl under BASE_URL; 'github' derives "
@@ -298,7 +357,7 @@ def main(argv=None) -> int:
     add_common_extract(sp)
     sp.set_defaults(fn=cmd_extract)
 
-    sp = sub.add_parser("merge", help="overlay records into primary records by lemma_id")
+    sp = sub.add_parser("merge", help="overlay records into primary records (by title unless --merge-key says otherwise)")
     sp.add_argument("--primary", default=RECORDS)
     sp.add_argument("--overlay", default=RECORDS_HF)
     sp.add_argument("--out", default=RECORDS_MERGED)
@@ -320,8 +379,9 @@ def main(argv=None) -> int:
     sp.add_argument("--schemas-dir", default=os.path.join("data", "schemas"))
     sp.add_argument("--engine", choices=["auto", "fast", "jsonschema"], default="auto",
                     help="fastjsonschema (default when installed) or the reference jsonschema package")
-    sp.add_argument("--validate-workers", type=int, default=None, metavar="N",
+    sp.add_argument("--validate-workers", type=_workers_arg, default=None, metavar="N",
                     help="processes for the schema check (default: every core)")
+    sp.add_argument("--validate-mode", choices=["shape", "full"], default="shape", help=_VALIDATE_MODE_HELP)
     sp.set_defaults(fn=cmd_validate)
 
     sp = sub.add_parser("smoke", help="look up known titles in a zip")
@@ -348,16 +408,30 @@ def main(argv=None) -> int:
                     help=f"zips to upload (default: {DIST_FULL} {DIST_LEX})")
     sp.add_argument("--repo", default=None, help="owner/name (default: from the origin remote)")
     sp.add_argument("--tag", default=None, help="release tag (default: v<revision of the first zip>)")
+    sp.add_argument("--target", default=None,
+                    help="commit the new tag points at (default: $GITHUB_SHA in GitHub Actions, "
+                         "otherwise the default branch's head)")
     sp.add_argument("--title", default=None, help="release title (default: the tag)")
     sp.add_argument("--notes-file", default=None, help="markdown notes (default: generated from data/stats)")
     sp.add_argument("--draft", action="store_true", help="create the release as a draft")
     sp.add_argument("--dry-run", action="store_true", help="check everything and print the gh commands")
     sp.set_defaults(fn=cmd_release)
 
-    sp = sub.add_parser("all", help="extract (+overlay, merge), build both zips, validate, smoke")
+    sp = sub.add_parser("audit", help="quality rates and golden-word checks for built zips")
+    sp.add_argument("zips", nargs="*", default=[DIST_FULL, DIST_LEX],
+                    help=f"zips to audit (default: {DIST_FULL} {DIST_LEX})")
+    sp.add_argument("--golden", default=None, help="golden words file (default: data/golden_words.tsv)")
+    sp.add_argument("--no-golden", action="store_true", help="report the rates only")
+    sp.add_argument("--workers", type=_workers_arg, default=None, metavar="N",
+                    help="processes to read the zip with (default: every core)")
+    sp.set_defaults(fn=cmd_audit)
+
+    sp = sub.add_parser("all", help="extract (+overlay, merge), build both zips, validate, smoke, audit")
     sp.add_argument("--overlay-hf", action="store_true")
     sp.add_argument("--cedict", default=None)
-    sp.add_argument("--no-validate", action="store_true", help="skip the schema check of both zips (the slowest step)")
+    sp.add_argument("--no-validate", action="store_true", help="skip the schema check of both zips")
+    sp.add_argument("--no-audit", action="store_true", help="skip the quality audit and its golden-word checks")
+    sp.add_argument("--golden", default=None, help="golden words file for the audit (default: data/golden_words.tsv)")
     add_common_extract(sp)
     add_common_build(sp)
     sp.set_defaults(fn=cmd_all)
