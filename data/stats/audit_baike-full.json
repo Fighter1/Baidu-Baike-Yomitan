@@ -1,0 +1,17 @@
+{
+ "golden_checks": 40,
+ "headwords": 4795093,
+ "headwords_whose_first_sense_is_a_work": 267980,
+ "headwords_with_a_repeated_sense": 125,
+ "headwords_with_a_work_above_another_sense": 2196,
+ "headwords_with_several_senses": 46890,
+ "of_those_without_a_label": 74527,
+ "rows": 8813748,
+ "scope": "full",
+ "senses": 4872771,
+ "senses_of_headwords_with_several": 124568,
+ "senses_without_a_reading": 148116,
+ "summaries_cut_inside_a_quote": 8149,
+ "summaries_starting_mid_list": 14403,
+ "summaries_that_say_nothing": 386
+}

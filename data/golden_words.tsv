@@ -1,0 +1,71 @@
+# Golden words: what a release has to show for words that a past release got wrong.
+# `python -m baike2yomitan audit` checks every line and fails when one does not hold.
+#
+# headword <TAB> check <TAB> value <TAB> scope
+#   scope: full, lexical, or empty for both dictionaries
+#   checks:
+#     present / absent        the headword is (not) in the dictionary
+#     reading VALUE           one of its senses has this reading
+#     first_reading VALUE     the sense shown first has this reading
+#     first VALUE             the sense shown first mentions VALUE (summary or sense label)
+#     first_not_work          the sense shown first is not a song, film, book …
+#     any VALUE               some sense mentions VALUE
+#     ends VALUE              the first sense's summary ends with VALUE
+#     traditional VALUE       the headword is also indexed under this spelling
+#     senses_max N            it has at most N senses
+
+# -- A work named after the word must not be shown first (2026.11.10.4: 时间 opened with a film song)
+时间	first_not_work
+时间	first	汉语词语
+北京	first_not_work
+北京	first	首都
+大学	first_not_work
+庐山	first_not_work
+朝阳	first_not_work
+等	first_not_work
+长大	first_not_work
+太阳	first_not_work
+朋友	first_not_work
+沧海一粟	first_not_work
+沧海一粟	first	成语
+
+# -- The 2019 article must not be replaced by another article of the same title
+庐山	any	九江
+大学	any	高等教育
+重庆	first	直辖市
+
+# -- Words with two readings take the everyday one (2026.11.10.4: 明朝 míng zhāo, 教授 jiāo shòu)
+明朝	reading	míng cháo
+教授	reading	jiào shòu
+教会	reading	jiào huì
+着火	reading	zháo huǒ
+不粘锅	reading	bù zhān guō
+不着四六	reading	bù zháo sì liù	full
+被褐藏辉	reading	pī hè cáng huī	full
+
+# -- An article about a character lists all its readings; the common one is shown
+了	first_reading	le
+通	first_reading	tōng
+明朝	first_reading	míng cháo
+
+# -- Traditional spellings use Taiwan character forms
+着火	traditional	著火
+里面	traditional	裡面
+为什么	traditional	為什麼
+不着四六	traditional	不著四六	full
+
+# -- Headwords that were dropped by mistake
+编辑	present
+语音	present
+潇洒	present
+片刻	present
+亨利五世	any	莎士比亚
+
+# -- One article, one sense
+保险单	senses_max	1
+长大	senses_max	2
+红色食品	senses_max	1	full
+
+# -- Summaries that were cut or empty
+板儿砖	ends	挺顺嘴儿的。	full
+鱼游濠上	first	纵情山水	full

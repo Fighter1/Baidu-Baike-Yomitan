@@ -1,0 +1,15 @@
+{
+ "golden_checks": 34,
+ "headwords": 81843,
+ "headwords_whose_first_sense_is_a_work": 1879,
+ "headwords_with_a_work_above_another_sense": 62,
+ "headwords_with_several_senses": 11894,
+ "of_those_without_a_label": 16939,
+ "rows": 167014,
+ "scope": "lexical",
+ "senses": 104436,
+ "senses_of_headwords_with_several": 34487,
+ "summaries_cut_inside_a_quote": 129,
+ "summaries_starting_mid_list": 396,
+ "summaries_that_say_nothing": 71
+}
