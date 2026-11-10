@@ -265,7 +265,7 @@ def cmd_release(a) -> int:
 
 
 def cmd_all(a) -> int:
-    from .cedict import DEFAULT_PATH, download, load_common_headwords, load_simplified_headwords
+    from .cedict import DEFAULT_PATH, MAX_AGE_HOURS, ensure_current, load_common_headwords, load_simplified_headwords
     from .report import save_stats, write_report
     from .validate import print_smoke, smoke
 
@@ -280,9 +280,8 @@ def cmd_all(a) -> int:
         cmd_merge(a)
         records = RECORDS_MERGED
     cedict_path = a.cedict or DEFAULT_PATH
-    if not os.path.exists(cedict_path):
-        print("downloading CC-CEDICT …")
-        download(cedict_path)
+    # the default copy follows MDBG; a file named with --cedict is the user's and is only fetched when missing
+    ensure_current(cedict_path, None if a.cedict or a.keep_cedict else MAX_AGE_HOURS)
     words = load_simplified_headwords(cedict_path)
     print(f"CC-CEDICT simplified headwords: {len(words):,}")
     exclude = set(t for t in (a.exclude_tags or "").split(",") if t)
@@ -428,7 +427,10 @@ def main(argv=None) -> int:
 
     sp = sub.add_parser("all", help="extract (+overlay, merge), build both zips, validate, smoke, audit")
     sp.add_argument("--overlay-hf", action="store_true")
-    sp.add_argument("--cedict", default=None)
+    sp.add_argument("--cedict", default=None,
+                    help="CC-CEDICT export to use (default: data/cedict/…, downloaded again when over a day old)")
+    sp.add_argument("--keep-cedict", action="store_true",
+                    help="build with the CC-CEDICT copy on disk however old it is")
     sp.add_argument("--no-validate", action="store_true", help="skip the schema check of both zips")
     sp.add_argument("--no-audit", action="store_true", help="skip the quality audit and its golden-word checks")
     sp.add_argument("--golden", default=None, help="golden words file for the audit (default: data/golden_words.tsv)")

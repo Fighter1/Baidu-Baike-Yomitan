@@ -100,7 +100,8 @@ python -X utf8 -m baike2yomitan release --dry-run        # upload dist zips as a
 
 `all` runs extract (both sources with `--overlay-hf`), merge, both builds,
 validation, the smoke test, a 20-record sample and the quality audit; it
-downloads CC-CEDICT when it is missing, and exits non-zero when validation,
+downloads CC-CEDICT when the copy on disk is missing or more than a day old,
+and exits non-zero when validation,
 the smoke test or a golden-word check fails. `--limit N` on `extract` stops
 after N input rows for fast iteration. `inputs`, `audit` and `release` are
 described in their own sections below.
@@ -120,7 +121,8 @@ described in their own sections below.
 | `--readings-cedict PATH\|none` | build, all | CC-CEDICT export to take readings from; default is the `--cedict` file, else `data/cedict/…` when present |
 | `--traditional s2tw\|s2t\|s2twp\|s2hk` | build, all | also emit a traditional-script headword for every entry whose OpenCC conversion differs from the simplified title; same content and sequence number. The modes differ in character forms, see *Showing simplified and traditional together* |
 | `--infobox` | build, all | render the extracted infobox pairs (first six) as a two-column table under the summary |
-| `--cedict PATH` | build, all | `build`: keep only records whose title is a simplified CC-CEDICT headword (the lexical build). `all`: where the MDBG export lives (default `data/cedict/…`, downloaded when missing); it always builds both zips |
+| `--cedict PATH` | build, all | `build`: keep only records whose title is a simplified CC-CEDICT headword (the lexical build). `all`: the MDBG export to use instead of `data/cedict/…`; a file named here is downloaded when missing and otherwise used as it is. `all` always builds both zips |
+| `--keep-cedict` | all | build with the copy in `data/cedict/` however old it is (to repeat an earlier build, or offline); without it the copy is downloaded again when it is more than a day old |
 | `--exclude-tags a,b` | build, all | drop records carrying any of these Baike tags; `all` applies it to the lexical build only. With `--cedict`, a headword CC-CEDICT lists as an ordinary word is only dropped when its text reads as a person, company or school (see *The lexical dictionary's tag filter*) |
 | `--title` | build | override the dictionary title stored in `index.json` (default `百度百科 (full)`, or `百度百科 (lexical)` with `--cedict`) |
 | `--revision R` | build, all | `index.json` revision; exactly four dot-separated integers (default: today plus `.1`, e.g. `2026.11.09.1`). Anything else is rejected before any work starts |
@@ -601,11 +603,16 @@ step is a safety margin rather than a requirement; the 16.8 GB file cannot be
 cached between runs (10 GB cache limit), so every run downloads it again. All
 five runs completed without memory problems.
 
-CC-CEDICT is not pinned: a build downloads the current MDBG export when it
-has none. The lexical dictionary and a few readings therefore differ slightly
-between a local build with an older copy and a release (121,612 headwords and
-167,014 lexical entries here, 121,633 and 167,052 in `v2026.11.10.6`; the
-full zips differed in two term banks out of 882).
+CC-CEDICT is not pinned: every build uses the MDBG export of the day, and the
+lexical dictionary and a few readings change with it. A release always
+downloads it, because the runner starts with an empty disk. A local `all`
+downloads it again when its copy is more than a day old and keeps the old copy
+when MDBG cannot be reached or answers with something that is not a complete
+export; `--keep-cedict` turns that off. Until 2026-11-10 a local copy was kept
+for good, which is why the local figures in this file come from an export of
+2026-11-07 (121,612 headwords and 167,014 lexical entries, against 121,633 and
+167,052 in `v2026.11.10.6`; the full zips differed in two term banks out of
+882, and 玳瑁猫 read dài mài locally because that entry was still wrong).
 
 Both workflows that contact Hugging Face pass the repository secret `HF_TOKEN`
 to that step when it is set (*Settings → Secrets and variables → Actions*).
