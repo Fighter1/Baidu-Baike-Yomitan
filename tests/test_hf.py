@@ -6,8 +6,8 @@ import pyarrow.parquet as pq
 
 from baike2yomitan.extract_hf import (assign_default_senses, convert, decode_url, extract,
                                       fallback_abstract, is_disambiguation, is_obfuscated,
-                                      lemma_id_from_item_url, snapshot_date,
-                                      split_repeated_abstract, title_from_url)
+                                      is_intro_heading, lemma_id_from_item_url, snapshot_date,
+                                      spaced_opening, split_repeated_abstract, title_from_url, unspace)
 from baike2yomitan.records import iter_records
 
 
@@ -204,3 +204,93 @@ def test_interface_words_stay_headwords_in_the_overlay():
     text = "编辑，是对资料或现成的作品进行整理、加工的工作，也指从事这种工作的人。"
     rec = convert(_snap("编辑", 535978, f"{text} {text} 正文"), collections.Counter(), 300)
     assert rec.title == "编辑" and rec.summary == text
+
+
+# ---------------------------------------------------------------- letter-spaced snapshots of 2023-24
+
+WU_YUE = ("解释播报编辑五岳： 指东岳泰山、西岳华山、南岳衡山、北岳恒山和中岳嵩山，是我国历史上的五大名山。"
+          "黄山：在安徽省南部。风景秀丽，以奇松、怪石、云海、温泉著名。极言黄山景观之胜。 [1]"
+          "出处播报编辑徐霞客的《漫游黄山仙境》。 [2]")
+
+
+def _spaced(text):
+    return " ".join(text)
+
+
+def test_unspace_takes_every_other_character():
+    assert unspace("解 释 播 报 编 辑 五 岳 ：   指 东 岳") == "解释播报编辑五岳： 指东岳"
+    assert unspace(_spaced(WU_YUE)) == WU_YUE
+    assert unspace("解释 播报 编辑") is None and unspace("") is None
+
+
+def test_headings_that_introduce_the_subject():
+    for h in ("解释", "成语解释", "定义", "词语释义", "简介", "内容简介", "学校简介", "基本介绍", "概述"):
+        assert is_intro_heading(h), h
+    for h in ("作者简介", "演员介绍", "演艺经历", "历史沿革", "基本信息", "成语出处", "歌曲歌词"):
+        assert not is_intro_heading(h), h
+
+
+def test_spaced_opening_is_the_first_introductory_section():
+    text = spaced_opening(WU_YUE, "五岳归来不看山，黄山归来不看岳")
+    assert text.startswith("五岳： 指东岳泰山") and text.endswith("极言黄山景观之胜。 [1]")      # not the next heading, 出处
+    # the introduction may come after a section that is not one
+    page = "演艺经历播报编辑2023年，出演电视剧《甲》。人物简介播报编辑张三，演员，毕业于北京电影学院。主要作品播报编辑参演电视剧甲。"
+    assert spaced_opening(page, "张三") == "张三，演员，毕业于北京电影学院。"
+    # a page that has no introduction is not used: what somebody did in 2023 does not say who they are
+    assert spaced_opening("演艺经历播报编辑2023年，出演电视剧《甲》。主要作品播报编辑参演电视剧甲。", "张三") is None
+    assert spaced_opening("作者简介播报编辑余华，当代作家，浙江海盐人。", "许三观卖血记") is None
+
+
+def test_spaced_opening_of_a_page_without_sections():
+    plain = "意谓贫贱的地位，不能改变其节；强暴的压力，不能挫伤其志。"
+    assert spaced_opening(plain, "贫贱不能移，威武不能屈") == plain
+    # it opens with a heading that pages with sections use for something else than an introduction
+    assert spaced_opening("歌曲歌词买了一套房子，花了三十多万，买房子的钱全靠银行贷款。", "买房子") is None
+    assert spaced_opening("内容简介这是一本对话形式的故事书，是物理学家和妻子每天早餐时间的闲谈。", "物理早自习").startswith("这是一本")
+    # the short headings 释义 and 解释, which also begin ordinary sentences, only where they cannot be one
+    assert spaced_opening("释义含有莱克多巴胺（俗称“瘦肉精”）的猪肉。", "莱猪") == "含有莱克多巴胺（俗称“瘦肉精”）的猪肉。"
+    assert spaced_opening("解释：没有什么畏惧和顾忌。", "无所畏忌") == "没有什么畏惧和顾忌。"
+    assert spaced_opening("解释学是关于理解和解释文本的哲学理论。", "诠释学").startswith("解释学是")
+    assert spaced_opening("释义学又称解释学，是一种哲学理论。", "释义学").startswith("释义学又称")
+    # a picture caption that repeats the first words, and text that starts inside a sentence
+    assert spaced_opening("简介播报编辑灯挂椅灯挂椅是靠背椅的一种款式。", "灯挂椅") == "灯挂椅是靠背椅的一种款式。"
+    assert spaced_opening("南锣鼓巷南锣鼓巷社区隶属于北京市东城区交道口街道。", "南锣鼓巷社区") == "南锣鼓巷社区隶属于北京市东城区交道口街道。"
+    assert spaced_opening("，人口密度126.4人/平方公里（2001年）。", "鲍姆加滕") is None
+
+
+def test_a_spaced_snapshot_with_an_introduction_becomes_a_record():
+    stats = collections.Counter()
+    rec = convert(_snap("五岳归来不看山，黄山归来不看岳", 9842880, _spaced(WU_YUE), ts=20240123171136), stats, 300)
+    assert rec.summary == ("五岳：指东岳泰山、西岳华山、南岳衡山、北岳恒山和中岳嵩山，是我国历史上的五大名山。"
+                           "黄山：在安徽省南部。风景秀丽，以奇松、怪石、云海、温泉著名。极言黄山景观之胜。")
+    assert rec.quality_flags == ["unspaced", "abstract_fallback"] and rec.lemma_id == 9842880
+    assert rec.snapshot_date == "2024-01-23" and not any(k.startswith("spaced:") for k in stats)
+
+
+def test_a_spaced_snapshot_with_injected_characters_stays_unreadable():
+    # 在长欢台沙召开: the characters a browser hides are in the text a scraper gets
+    junk = "简介播报编辑2023年8月15日设捆，湖南省美术家协会美术教育委员会成立大会巩己誉灶在长欢台沙召开腿懂弃。"
+    stats = collections.Counter()
+    rec = convert(_snap("湖南省美术家协会", 5, _spaced(junk), ts=20240101000000), stats, 300)
+    assert "obfuscated" in rec.quality_flags and "unspaced" not in rec.quality_flags
+    assert stats["spaced:injected_characters"] == 1
+    # and one without an introduction
+    stats = collections.Counter()
+    rec = convert(_snap("张三", 6, _spaced("演艺经历播报编辑2023年，出演电视剧《甲》，在剧中饰演乙。"), ts=20240101000000), stats, 300)
+    assert "obfuscated" in rec.quality_flags and stats["spaced:no_introduction"] == 1
+
+
+def test_a_recovered_page_is_only_used_for_a_title_nothing_else_covers(tmp_path):
+    clean = "孙女，指儿子的女儿，也用来称呼与孙女同辈的年轻女子，是汉语里常用的亲属称谓。"
+    rows = [_snap("五岳归来不看山，黄山归来不看岳", 9842880, _spaced(WU_YUE), ts=20240123171136),
+            _snap("孙女", 11, _spaced("解释播报编辑指的是儿子的女儿。个别地方亦代指外孙女，即女儿的女儿。出处播报编辑北齐颜之推《颜氏家训》。"),
+                  ts=20240101000000),
+            _snap("孙女", 22, f"{clean} {clean} 正文", ts=20220101000000),
+            _snap("张三", 33, _spaced("演艺经历播报编辑2023年，出演电视剧《甲》，在剧中饰演乙。"), ts=20240101000000)]
+    recs, stats = _extract(rows, tmp_path)
+    by_title = {r["title"]: r for r in recs}
+    assert set(by_title) == {"五岳归来不看山，黄山归来不看岳", "孙女"}
+    assert by_title["孙女"]["summary"] == clean and by_title["孙女"]["lemma_id"] == 22
+    assert "unspaced" in by_title["五岳归来不看山，黄山归来不看岳"]["quality_flags"]
+    assert stats["drop:unspaced_title_has_other_snapshot"] == 1 and stats["drop:obfuscated_no_clean_duplicate"] == 1
+    assert stats["flag:unspaced"] == 1

@@ -155,7 +155,8 @@ counted in `data/extract_report.md`. Rules, in the order they are applied:
 | `dup_title_summary` | 563w | same title and identical cleaned summary already written |
 | `disambiguation_page` | hf | content is a list of at least two different short `<title>：<descriptor>` items (60 characters each at most), not an article. An article whose abstract opens with `<title>：` is not one |
 | `summary_too_short[_fallback]` | hf | abstract shorter than 15 characters after cleaning |
-| `obfuscated_no_clean_duplicate` | hf | more than 30% of the page's Chinese characters stand alone between spaces (the 2024 anti-scraping `总 录 播 报` spacing) and no clean snapshot of the same article exists. A run of spaced characters by itself is not enough: tables and name lists have those too |
+| `obfuscated_no_clean_duplicate` | hf | more than 30% of the page's Chinese characters stand alone between spaces (the `总 录 播 报` spacing of the 2023–24 snapshots), the page could not be recovered (see *Letter-spaced snapshots*), and no other snapshot of the same article exists. A run of spaced characters by itself is not enough: tables and name lists have those too |
+| `unspaced_title_has_other_snapshot` | hf | a recovered letter-spaced page whose title another snapshot covers |
 | `dup:lemma_id` | hf | several snapshots of one article id; the cleanest, then one with a subtitle, then the newest is kept |
 | `dup:title_subtitle` | hf | several id-less snapshots with the same title and subtitle |
 | `dup:idless_same_summary` | hf | an id-less snapshot (the page `/item/<title>` shows) that has the same subtitle or mostly the same text as an article with an id; the two are folded and that article is marked as the title's default sense |
@@ -216,12 +217,12 @@ is part of the article's own title (语音编辑器) is not removed.
 Overlay links keep the characters that mean something in a URL encoded
 (`/item/C%23/195147`), so they still lead to the article.
 
-Outputs (figures from a local build of 2026-11-10 with the rules described here, `--pinyin --traditional s2tw --infobox`; release `2026.11.10.6` has them all except the info table rule under *Record schema*):
+Outputs (figures from a local build of 2026-11-10 with the rules described here, `--pinyin --traditional s2tw --infobox`; release `2026.11.10.7` has them all except the letter-spaced snapshots):
 
-- `data/records.jsonl` (4.67 M records), `data/records.hf.jsonl` (401 k), `data/records.merged.jsonl` (4.87 M) — one JSON record per sense
+- `data/records.jsonl` (4.67 M records), `data/records.hf.jsonl` (414 k), `data/records.merged.jsonl` (4.88 M) — one JSON record per sense
 - `data/extract_report.md` — drop counts by reason, quality flags, merge counts, heuristics notes
 - `data/short_summary_examples.md` — sampled analysis of the under-15-character drops that motivated the paragraph-walking fallback
-- `dist/baike-full.zip` — everything that survived extraction: 8.8 M entries (incl. 3.9 M traditional headwords), 882 term banks, ~1.4 GB
+- `dist/baike-full.zip` — everything that survived extraction: 8.8 M entries (incl. 3.9 M traditional headwords), 883 term banks, ~1.4 GB
 - `dist/baike-lexical.zip` — only titles that are simplified CC-CEDICT headwords (107 k records), minus `--exclude-tags 人物,企业,学校` (2,167 dropped, 1,662 kept because they are ordinary words): 167 k entries, 28 MB
 - `dist/<name>.index.json` — a copy of each zip's `index.json`, written when `--update-url` is given (see *Self-updating dictionaries*)
 - `data/stats/*.json` — the counters behind the report and the release notes, including `audit_<zip>.json`
@@ -239,6 +240,45 @@ whole-schema check that took 13 min on 24 processes and 33 min on 4
 (`--validate-mode full` still does that); the audit of both zips takes about
 1 min on 24 processes and 2 min for the full zip on 4. Extraction, merge and
 build use one core; validation and the audit use all of them.
+
+### Letter-spaced snapshots
+
+Of the 587,819 overlay rows, 50,909 are pages archived in 2023 and 2024 that
+come with a space after every character (`解 释 播 报 编 辑 五 岳 ： …`).
+They used to be dropped unless an earlier, clean snapshot of the article
+existed. The text is every other character of the row, so it can be put back
+exactly, but two things stand in the way of using it:
+
+- **These pages have no abstract.** The text starts at the first section, each
+  section as `<heading>播报编辑<text>`. A summary is taken from the first
+  section whose heading promises an introduction: a definition (`解释`, `定义`,
+  `释义`, `成语解释` …) or `…简介`, `…介绍`, `概述`, `概况`, except the
+  introduction of somebody else (`作者简介`). What a page says under
+  `演艺经历` or `历史沿革` does not tell what the thing is, and such a page
+  stays dropped (27,487 rows). A page without section headings is its own
+  introduction, unless it opens with a heading that pages with sections use
+  for something else (`歌曲歌词`, `所获荣誉`).
+- **Baidu Baike injects random characters into the text it serves to
+  scrapers**, two to six at a time: `在长欢台沙召开` for 在长沙召开. They come
+  from a pool of a few hundred mostly ordinary characters. A passage is
+  refused (8,019 rows) when it has Chinese characters inside a Latin word or
+  a year (`Wor去乌ld`), or two pool characters side by side that the 2019
+  corpus, which has no such junk, never has side by side (`颈遥`). On the
+  2019 summaries this test raises a false alarm in 0.4% of them; in 280
+  recovered summaries read by hand, one still had injected characters.
+
+The pool (237 characters), the 15,086 pairs that real text has and the
+section headings of these pages (2,773) are learned from the corpora and kept
+in `baike2yomitan/spaced_snapshots.txt`; `python -m baike2yomitan.junk` learns
+them again from `data/raw/overlay` and `data/records.jsonl`.
+
+A recovered page gets the flags `unspaced` and `abstract_fallback`. It is
+never used to refresh a 2019 record or as a further sense of a title that has
+one, and it is dropped when another snapshot covers its title: it is the
+first section of an article, not its abstract. 12,343 such records are
+written; they add 4,742 headwords to the full dictionary and 199 to the
+lexical one (剔透, 报幕, 完婚, 执导, 坊间, 束手就擒, and the proverb
+五岳归来不看山，黄山归来不看岳 that prompted this).
 
 ### Merge semantics
 
@@ -321,7 +361,9 @@ together from lines the article broke in mid-sentence),
 under 15 characters but was kept by the rules above),
 `infobox_below_top_skipped` (the page has an info table further down than its
 second section, which was not taken), `abstract_fallback`
-(overlay content had no repeated abstract), `summary_refreshed` (merge replaced
+(overlay content had no repeated abstract), `unspaced` (the summary is the
+introductory section of a letter-spaced 2023–24 snapshot, see *Letter-spaced
+snapshots*), `summary_refreshed` (merge replaced
 the summary with the overlay's; the flags about how the 2019 summary was found
 are removed), `no_lemma_id`.
 `is_default_sense` is `true` for the overlay sense that the id-less URL

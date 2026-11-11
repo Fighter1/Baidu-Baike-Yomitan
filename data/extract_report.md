@@ -1,23 +1,23 @@
 # Extract report
 
-Generated 2026-11-10 17:01.
+Generated 2026-11-10 23:30.
 
 ## audit_baike-full
 | metric | value |
 |---|---:|
-| golden_checks | 44 |
-| headwords | 4,795,093 |
-| headwords_whose_first_sense_is_a_work | 267,980 |
+| golden_checks | 48 |
+| headwords | 4,799,908 |
+| headwords_whose_first_sense_is_a_work | 268,153 |
 | headwords_with_a_repeated_sense | 125 |
 | headwords_with_a_work_above_another_sense | 2,196 |
-| headwords_with_several_senses | 46,890 |
-| of_those_without_a_label | 74,527 |
-| rows | 8,813,748 |
+| headwords_with_several_senses | 46,903 |
+| of_those_without_a_label | 74,554 |
+| rows | 8,822,316 |
 | scope | full |
-| senses | 4,872,771 |
-| senses_of_headwords_with_several | 124,568 |
-| senses_without_a_reading | 148,116 |
-| summaries_cut_inside_a_quote | 8,149 |
+| senses | 4,877,600 |
+| senses_of_headwords_with_several | 124,595 |
+| senses_without_a_reading | 148,274 |
+| summaries_cut_inside_a_quote | 8,154 |
 | summaries_starting_mid_list | 14,403 |
 | summaries_that_say_nothing | 386 |
 
@@ -25,15 +25,15 @@ Generated 2026-11-10 17:01.
 | metric | value |
 |---|---:|
 | golden_checks | 35 |
-| headwords | 81,843 |
-| headwords_whose_first_sense_is_a_work | 1,879 |
+| headwords | 82,061 |
+| headwords_whose_first_sense_is_a_work | 1,881 |
 | headwords_with_a_work_above_another_sense | 62 |
-| headwords_with_several_senses | 11,894 |
-| of_those_without_a_label | 16,939 |
-| rows | 167,014 |
+| headwords_with_several_senses | 11,896 |
+| of_those_without_a_label | 16,943 |
+| rows | 167,375 |
 | scope | lexical |
-| senses | 104,436 |
-| senses_of_headwords_with_several | 34,487 |
+| senses | 104,657 |
+| senses_of_headwords_with_several | 34,492 |
 | summaries_cut_inside_a_quote | 129 |
 | summaries_starting_mid_list | 396 |
 | summaries_that_say_nothing | 71 |
@@ -41,31 +41,31 @@ Generated 2026-11-10 17:01.
 ## build_baike-full
 | metric | value |
 |---|---:|
-| entries | 8,813,748 |
-| entries_traditional | 3,940,977 |
-| records_seen | 4,872,771 |
-| seconds | 894 |
-| term_banks | 882 |
-| titles_with_multiple_senses | 46,890 |
-| zip_bytes | 1,410,737,981 |
+| entries | 8,822,185 |
+| entries_traditional | 3,944,658 |
+| records_seen | 4,877,527 |
+| seconds | 748 |
+| term_banks | 883 |
+| titles_with_multiple_senses | 46,903 |
+| zip_bytes | 1,412,370,267 |
 
 ## build_baike-lexical
 | metric | value |
 |---|---:|
-| entries | 167,014 |
-| entries_traditional | 62,578 |
-| records_seen | 4,872,771 |
-| seconds | 125 |
+| entries | 167,374 |
+| entries_traditional | 62,718 |
+| records_seen | 4,877,527 |
+| seconds | 92 |
 | term_banks | 17 |
-| titles_with_multiple_senses | 46,890 |
-| zip_bytes | 27,982,195 |
+| titles_with_multiple_senses | 46,903 |
+| zip_bytes | 28,032,677 |
 
 **Skipped at build**
 
 | reason | count |
 |---|---:|
 | excluded_tag | 2,167 |
-| not_in_cedict | 4,766,168 |
+| not_in_cedict | 4,770,704 |
 
 ## build_ci-smoke
 | metric | value |
@@ -80,9 +80,9 @@ Generated 2026-11-10 17:01.
 ## cedict
 | metric | value |
 |---|---:|
-| cedict_headwords | 121,612 |
-| lexical_entries_after_tag_exclusion | 167,014 |
-| records_with_cedict_title | 106,603 |
+| cedict_headwords | 121,633 |
+| lexical_entries_after_tag_exclusion | 167,374 |
+| records_with_cedict_title | 106,823 |
 
 ## extract_563w
 | metric | value |
@@ -91,7 +91,7 @@ Generated 2026-11-10 17:01.
 | input_rows | 5,634,898 |
 | output | data\records.jsonl |
 | records_written | 4,674,224 |
-| seconds | 965 |
+| seconds | 817 |
 
 **Drops by reason**
 
@@ -126,55 +126,57 @@ Generated 2026-11-10 17:01.
 ## extract_hf
 | metric | value |
 |---|---:|
-| default_senses | 142,457 |
+| default_senses | 144,488 |
 | input | data\raw\overlay |
 | input_rows | 587,819 |
 | output | data\records.hf.jsonl |
-| records_written | 401,223 |
-| seconds | 384 |
+| records_written | 413,566 |
+| seconds | 376 |
 
 **Drops by reason**
 
 | reason | count |
 |---|---:|
 | disambiguation_page | 26,779 |
-| obfuscated_no_clean_duplicate | 45,704 |
+| obfuscated_no_clean_duplicate | 31,627 |
 | summary_too_short | 773 |
-| summary_too_short_fallback | 681 |
+| summary_too_short_fallback | 879 |
 | title_too_long | 265 |
+| unspaced_title_has_other_snapshot | 1,552 |
 
 **Quality flags on kept records**
 
 | reason | count |
 |---|---:|
-| abstract_fallback | 23,406 |
-| kept_short_sentence | 4,352 |
-| no_lemma_id | 42,389 |
+| abstract_fallback | 35,749 |
+| kept_short_sentence | 4,678 |
+| no_lemma_id | 44,244 |
+| unspaced | 12,343 |
 
 **Duplicates folded**
 
 | reason | count |
 |---|---:|
-| idless_same_summary | 101,293 |
-| lemma_id | 8,272 |
+| idless_same_summary | 101,298 |
+| lemma_id | 8,251 |
 | title_subtitle | 2,829 |
 
 ## merge
 | metric | value |
 |---|---:|
-| added | 198,547 |
+| added | 203,303 |
 | added_extra_sense_of_known_title | 74,650 |
-| added_new_title | 123,897 |
-| kept_primary | 51,944 |
+| added_new_title | 128,653 |
+| kept_primary | 59,433 |
 | key | title |
-| overlay_records | 401,223 |
+| overlay_records | 413,566 |
 | primary_records | 4,674,224 |
-| records_written | 4,872,771 |
+| records_written | 4,877,527 |
 | refreshed | 178,963 |
-| skipped | 75,723 |
+| skipped | 90,799 |
 | skipped_primary_title_ambiguous | 66 |
-| skipped_repeated_sense | 2,757 |
-| skipped_weak_sense_of_known_title | 20,956 |
+| skipped_repeated_sense | 2,759 |
+| skipped_weak_sense_of_known_title | 28,541 |
 
 ## Source inspection: deviations from the task description
 
@@ -347,7 +349,8 @@ from shards 0000 and 0004.
    CJK punctuation, is removed; spaces around Latin words are kept.
 8. **Infobox**: only `基本信息`/`基本资料` sections whose body has ≥2 `key：value`
    lines; many such sections in this crawl are one long `k: v; k: v` line and
-   yield nothing.
+   yield nothing. Since 2026-11-10 only when the section is the first or the
+   second of the page (see the last section of this file).
 9. **Tag bank**: the only tag is `百科` (category `name`). Baike tags are shown
    as muted footer text (first five) and used only for `--exclude-tags`.
 10. **Traditional headwords** via OpenCC `s2t` by default (`s2twp` available);
@@ -465,3 +468,54 @@ a quote or bracket 8,149 and 129. The last two are not addressed.
 **Not fixed**: an ambiguous character later in a title (子丑寅卯 → 子醜寅卯);
 overlay records have no tags, so the lexical tag filter never sees them;
 summaries that start in the middle of a numbered list.
+
+## After release 2026.11.10.6: info tables of another article
+
+余华 the writer was shown with 性别 女, 出生日期 1981-01-19, 身高 175cm. The
+2019 row for that title has twelve sections: ten of the writer's article, then
+`基本信息` and `主要成绩` of a rower of the same name. The extractor took the
+first `基本信息` section anywhere on the page. 时间 (the physical quantity with
+a film's table) and 张衡 had the same fault.
+
+Where the 432,606 parseable info sections sit, and how often a random sample
+of 30 showed a table that does not belong to the summary:
+
+| position of the section | rows | wrong in sample |
+|---|---:|---:|
+| first | 394,831 | not sampled |
+| second, no summary field | 23,141 | 0 of 30 |
+| second, with summary field | 3,555 | 4 of 30 |
+| third or later, no summary field | 4,411 | 12 of 30 |
+| third or later, with summary field | 6,668 | 22 of 30 |
+
+Nothing in a row marks where one article ends, and a rule on the table's name
+row did not separate the cases (keys such as 英文名称 look like a different
+name). So the rule is positional: a table is taken from the first or second
+section only. 11,008 records carry the flag `infobox_below_top_skipped`.
+
+Effect on the full zip, against release 2026.11.10.6: 485,480 senses had a
+table, 474,779 have one; 10,701 tables are gone and none was added. Of 40
+dropped tables drawn at random, 26 belonged to another article (a housing
+estate under a textbook, a mini-game under a village, a film under a word).
+The 14 others were the page's own table (book data under a book), which is the
+price of the rule.
+
+A dropped table keeps a `拼音`/`读音` row that fits the title character by
+character (307 senses now show only that row). Without it five readings became
+worse in a first build (黄裳 huáng shang for huáng cháng, 淇奥 qí ào for
+qí yù). Keeping every such row was wrong as well: 日本财团 then showed
+拼音名 Baihua Huoxue Dieda Gao, from a medicine's page at the end of its row.
+`reading:article` is 86,541 (was 86,537) and `pinyin_line_kept` 73,070 (was
+73,039), because a page's own pinyin line now takes the place of a dropped
+row. Three readings differ from the release: 一咕噜 is yī gū lū, from the
+page's pinyin line, where it was yī gū lu; 玳瑁猫 and 英国玳瑁猫 (dài mài)
+come from the CC-CEDICT export on this machine, which has that entry wrong,
+while the release was built with a newer export.
+
+**Not fixed**: about 470 tables in second place under a summary field that
+belong to another article (4 of 30 in the sample); the tags of such a row are
+mixed in the same way.
+
+Golden words: 余华 `table_lacks` 1981-01-19 and 175cm, 时间 `table_lacks`
+影片名称, 张衡 `table_lacks` 片名. 44 of 44 checks hold on the full zip, 35 of 35
+on the lexical one; the audit rates are unchanged.

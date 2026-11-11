@@ -95,7 +95,8 @@ from shards 0000 and 0004.
   abstracts come from body text and may carry this junk. Not detectable by rule.
 - 2024 snapshots are almost all obfuscated (`总 录 播 报 编 辑 …`): 837 of 838
   sampled 2024 rows, 10 % of 2023 rows. The regex `(?:[一-鿿] ){4,}`
-  plus a >30 % lone-character share catches them.
+  plus a >30 % lone-character share catches them. (Since 2026-11-10 some are
+  recovered, see the last section of this file.)
 - 28 % of rows have an id-less `base_url`. The `url` column often carries
   `?fromModule=…` and leading-space / quoted title variants; `base_url` is clean.
   The `title` column is already normalised (URL path may contain `"直立人"`,
@@ -339,3 +340,71 @@ mixed in the same way.
 Golden words: 余华 `table_lacks` 1981-01-19 and 175cm, 时间 `table_lacks`
 影片名称, 张衡 `table_lacks` 片名. 44 of 44 checks hold on the full zip, 35 of 35
 on the lexical one; the audit rates are unchanged.
+
+## After release 2026.11.10.7: letter-spaced snapshots
+
+五岳归来不看山，黄山归来不看岳 is in the overlay, as one snapshot of
+2024-01-23, and was not in the dictionary: the snapshot is letter-spaced, no
+clean one exists, and the 2019 corpus has no row of that title (its id 9842880
+is a laptop there, the two sources not sharing ids).
+
+What the 50,909 letter-spaced rows are (43,618 of 2024, 7,268 of 2023, 53
+older):
+
+- All but 30 have a space after every character, a space of the text
+  included. Every other character is the text.
+- Only 10 have the abstract that other snapshots repeat at the start. The
+  rest begin at the first section; 43,547 open with a heading and `播报编辑`.
+- About a third have injected characters. They were not detectable "by rule"
+  in the first review; they are by where they stand. Inside Latin words and
+  years (`Wor去乌ld`, 20,457 characters in these rows) a Chinese character can
+  only have been injected, which gives the pool: 237 characters after leaving
+  out those that ordinary text between Latin letters explains. Two pool
+  characters side by side are then compared with the 2019 summaries, where
+  15,086 of the 56,169 possible pairs occur twice or more.
+
+Measured before the rule went into the extractor:
+
+| | |
+|---|---:|
+| false alarms of the pair test on 467,423 held-out 2019 summaries | 0.28% |
+| false alarms of the inside-a-word test on the same | 0.11% |
+| first sections refused for injected characters | 16,449 of 47,435 |
+| visible junk in 130 + 150 accepted summaries read by hand | 1 (兽人种) |
+
+Tried and dropped: a score over single characters (fooled by a topic word
+that repeats, 函数 or 干燥, and blind to a page with one injected run);
+counting rare pool characters (too few of them in a short definition).
+
+Which section is used: the first whose heading ends in 解释, 释义, 定义,
+含义, 涵义, 词义, 概念, 意思, 简介, 介绍, 概述, 概况, 简述 or 概要, unless it
+starts with 作者, 编者, 译者, 主编, 导演, 演员, 主演, 嘉宾, 角色, 主创, 团队,
+成员, 选手, 出品 or 制作. First headings of the pages that would add a title:
+(none) 3,384, 剧情简介 1,130, 演艺经历 830, 历史沿革 710, 简介 575,
+内容简介 504, 人物经历 406, 解释 364, 定义 322. The sections on a career or
+a history were left out on purpose: `2023年，出演…` is no definition.
+
+Result of the extraction: 27,487 rows without an introduction, 8,019 with
+injected characters, 30 not laid out as every other character; 12,343 records
+written with the flag `unspaced`, 1,552 dropped because another snapshot
+covers the title; `obfuscated_no_clean_duplicate` 31,627 (was 45,704);
+overlay records 413,566 (was 401,223).
+
+Effect on the zips, against release 2026.11.10.7:
+
+| | full, before | full, now | lexical, before | lexical, now |
+|---|---:|---:|---:|---:|
+| headwords | 4,795,093 | 4,799,835 | 81,861 | 82,060 |
+| senses | 4,872,771 | 4,877,527 | 104,457 | 104,656 |
+| entries (rows) | 8,813,748 | 8,822,185 | 167,052 | 167,374 |
+
+No headword and no sense of the lexical dictionary changed or went; 199 were
+added. Golden words: 48 of 48 (full) and 35 of 35 (lexical). Senses without a
+reading 148,266 (was 148,116), summaries cut inside a quote 8,154 (was 8,149).
+
+**Not fixed**: a recovered summary can open with a picture caption that does
+not repeat the title (航母庞大的航母是…), or be the plot of a film that
+shares its title with a word (三分之一, 白头山); pages whose only sections are
+a career or a history are not used although their first sentence often says
+who the person is; the injected characters in the body text of ordinary
+2021–2023 snapshots (fallback abstracts) are not tested.

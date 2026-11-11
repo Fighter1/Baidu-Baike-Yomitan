@@ -76,3 +76,9 @@
 余华	table_lacks	175cm	full
 时间	table_lacks	影片名称
 张衡	table_lacks	片名	full
+
+# -- Letter-spaced snapshots of 2023-24 are read when they have an introduction (2026.11.10.7 lacked these headwords)
+五岳归来不看山，黄山归来不看岳	present		full
+五岳归来不看山，黄山归来不看岳	any	极言黄山景观之胜	full
+姐丈	any	姐姐的丈夫	full
+计劳纳封	any	根据付出的劳动而接受封赏	full

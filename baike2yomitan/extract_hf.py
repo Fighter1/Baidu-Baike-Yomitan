@@ -13,6 +13,7 @@ from typing import Iterator
 
 from .cleaning import (SAME_ARTICLE, clean_text, clean_title, short_summary_keep_reason, similarity,
                        summary_drop_reason, title_drop_reason, trim_summary)
+from .junk import injected, known_headings
 from .records import Record, RecordWriter
 
 SOURCE = "hf"
@@ -22,6 +23,21 @@ MAX_DESCRIPTOR_CHARS = 60  # per sense of a sense-list page
 _LONE_CJK_RE = re.compile(r"(?<!\S)[一-鿿](?!\S)")
 _CJK_RE = re.compile(r"[一-鿿]")
 _HEADING_RE = re.compile(r"^\s*(?P<title>.{1,40}?)(?:编辑播报|播报编辑|编辑语音|编辑|播报)\s+")
+_SECTION_MARK_RE = re.compile(r"播报编辑|编辑播报")       # what follows every section heading of a page
+_SENTENCE_END = "。！？；”’）》\\]\\s"
+_HEADING_TAIL_RE = re.compile(rf"[{_SENTENCE_END}]([^{_SENTENCE_END}]{{1,14}})$")
+MAX_HEADING_CHARS = 24
+MIN_FUSED_HEADING_CHARS = 4     # shorter known headings (历史, 简介) also start ordinary sentences
+_REPEATED_OPENING_RE = re.compile(r"^(《?[^，。；：！？\s]{3,30}?》?)\1")
+_BAD_OPENING = "，。、；：！？）】》”’"
+# A page without section marks that opens '释义1、喜欢管闲事的人' or '解释：…': the two characters are a heading.
+_FUSED_DEFINING_RE = re.compile(r"^(?:释义|(?:解释|定义|简介)(?=[\d\[（(《“【：:①⒈❶]))[：:]?")
+JUNK_WINDOW = 500           # characters of a section that are searched for injected ones
+# Headings of a section that says what the article is about: a definition ...
+_DEFINING_HEADING_RE = re.compile(r"(?:解释|释义|定义|含义|涵义|词义|概念|意思)$")
+# ... or an introduction, unless it introduces somebody else (the author of a book, the cast of a film).
+_INTRO_HEADING_RE = re.compile(r"(?:简介|介绍|概述|概况|简述|概要)$")
+_INTRO_OF_OTHERS_RE = re.compile(r"^(?:作者|编者|译者|主编|导演|演员|主演|嘉宾|角色|主创|团队|成员|选手|出品|制作)")
 
 
 def decode_url(url: str | None) -> str:
@@ -64,6 +80,78 @@ def is_obfuscated(text: str) -> bool:
         return False
     lone = len(_LONE_CJK_RE.findall(text))
     return lone / cjk > 0.3
+
+
+def unspace(content: str) -> str | None:
+    """'解 释 播 报 编 辑 五 岳 ：   指 东 岳' -> '解释播报编辑五岳： 指东岳'.
+
+    The 2023-24 snapshots put a space after every character, a space of the
+    text included, so the text is every other character. None when the
+    content is not laid out like that throughout."""
+    if not content or not content[1::2].strip() == "":
+        return None
+    return content[::2]
+
+
+def is_intro_heading(heading: str) -> bool:
+    """A section heading under which the article says what its subject is."""
+    if _DEFINING_HEADING_RE.search(heading):
+        return True
+    return bool(_INTRO_HEADING_RE.search(heading)) and not _INTRO_OF_OTHERS_RE.match(heading)
+
+
+def spaced_opening(plain: str, title: str = "") -> str | None:
+    """The text that introduces the subject of an un-spaced 2023-24 page, or
+    None when the page has none.
+
+    These snapshots lack the abstract that the earlier ones start with: the
+    text begins at the first section, each section as '<heading>播报编辑<text>'
+    with nothing between the text of one and the heading of the next. So the
+    text is taken from the first section whose heading promises an
+    introduction (解释, 定义, 简介, 内容简介 ...). What a page says under
+    演艺经历 or 历史沿革 does not tell what the thing is. A page without
+    section headings is its own introduction, unless it opens with a heading
+    that the pages with sections use for something else (歌曲歌词, 所获荣誉)."""
+    marks = list(_SECTION_MARK_RE.finditer(plain))
+    if not marks:
+        text = plain.lstrip()
+        for size in range(min(8, len(text)), MIN_FUSED_HEADING_CHARS - 1, -1):
+            if text[:size] in known_headings():
+                return _opening_text(text[size:], title) if is_intro_heading(text[:size]) else None
+        if not title.startswith(text[:2]):
+            text = _FUSED_DEFINING_RE.sub("", text)
+        return _opening_text(text, title)
+    heading = plain[:marks[0].start()].strip()
+    if len(heading) > MAX_HEADING_CHARS:
+        m = _HEADING_TAIL_RE.search(heading)        # the page opens with text of its own: that is the introduction
+        return _opening_text(heading[:m.start() + 1], title) if m else None
+    for i, mark in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(plain)
+        body, next_heading = plain[mark.end():end], ""
+        if i + 1 < len(marks):
+            m = _HEADING_TAIL_RE.search(body)
+            if m:
+                body, next_heading = body[:m.start() + 1], m.group(1)
+        if is_intro_heading(heading):
+            return _opening_text(body, title)
+        heading = next_heading.strip()
+    return None
+
+
+def _opening_text(text: str, title: str) -> str | None:
+    """The text of an introduction without the picture caption that repeats
+    its first words (灯挂椅灯挂椅是靠背椅的一种款式); None when it starts in
+    the middle of a sentence."""
+    text = text.lstrip()
+    if title and text.startswith(title + title):
+        text = text[len(title):]
+    else:
+        m = _REPEATED_OPENING_RE.match(text)
+        if m:
+            text = text[m.end(1):]
+    if not text or text[0] in _BAD_OPENING:
+        return None
+    return text
 
 
 def is_disambiguation(text: str, title: str) -> bool:
@@ -162,11 +250,28 @@ def convert(row: dict, stats: collections.Counter, max_summary_chars: int) -> Re
         stats["drop:" + reason] += 1
         return None
     content = row.get("content") or ""
-    flags = ["obfuscated"] if is_obfuscated(content) else []
+    flags = []
+    recovered = None
+    if is_obfuscated(content):
+        # A letter-spaced snapshot. Its text can be put back together, but it
+        # is kept only when it has an introduction and no injected characters.
+        plain = unspace(content)
+        recovered = spaced_opening(plain, title) if plain is not None else None
+        if plain is None:
+            stats["spaced:not_every_other_character"] += 1
+        elif recovered is None:
+            stats["spaced:no_introduction"] += 1
+        elif injected(recovered[:JUNK_WINDOW]):
+            stats["spaced:injected_characters"] += 1
+            recovered = None
+        if recovered is None:
+            flags.append("obfuscated")
+        else:
+            flags += ["unspaced", "abstract_fallback"]
     if is_disambiguation(content, title):
         stats["drop:disambiguation_page"] += 1
         return None
-    abstract = split_repeated_abstract(content)
+    abstract = recovered if recovered is not None else split_repeated_abstract(content)
     if abstract is None:
         abstract = fallback_abstract(content, title)
         flags.append("abstract_fallback")
@@ -215,7 +320,7 @@ def _summary_signature(summary: str) -> str:
 def _quality(rec: Record) -> tuple:
     """Lower = better: cleanest first, then one that has a subtitle, then newest."""
     f = rec.quality_flags
-    score = (2 if "obfuscated" in f else 0) + (1 if "abstract_fallback" in f else 0)
+    score = (4 if "obfuscated" in f else 0) + (1 if "abstract_fallback" in f else 0) + (1 if "unspaced" in f else 0)
     return (score, 0 if rec.sense_label else 1, -(int((rec.snapshot_date or "0000-00-00").replace("-", ""))))
 
 
@@ -314,10 +419,17 @@ def extract(path: str, out_path: str, limit: int | None = None,
             folded._idless = True  # type: ignore[attr-defined]
             with_id[with_id.index(match)] = folded
         keep_list.extend(with_id)
+    # A page recovered from a letter-spaced snapshot is the first section of
+    # an article, not its abstract. It is used for a title that nothing else
+    # covers; next to an ordinary snapshot of the title it would be the same
+    # article a second time, in worse words.
+    covered = {rec.title for rec in keep_list if not {"obfuscated", "unspaced"} & set(rec.quality_flags)}
     written: list[Record] = []
     for rec in keep_list:
         if "obfuscated" in rec.quality_flags:
             stats["drop:obfuscated_no_clean_duplicate"] += 1
+        elif "unspaced" in rec.quality_flags and rec.title in covered:
+            stats["drop:unspaced_title_has_other_snapshot"] += 1
         else:
             written.append(rec)
     assign_default_senses(written)
