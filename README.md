@@ -300,11 +300,26 @@ written `&#91;2&#93;` is removed like `[2]`, and pinyin written with entities
 counts as pinyin: a summary that shows the reading no longer gets a second
 one in the info table.
 
-- Up to four passes, for text escaped several times (`&amp;amp;nbsp;`).
+- Until nothing changes, for text escaped several times (`&amp;amp;nbsp;`;
+  木村井泓 has an `&` escaped seven times).
 - Names Python's table lacks (`&amacron;`, `&ndotblw;` and other
-  transliteration letters) and names in capitals (`&NBSP;`) are covered;
-  `&nbsp` without its semicolon becomes a space unless a letter or a digit
-  follows, a soft hyphen is removed.
+  transliteration letters) and names in capitals (`&NBSP;`) are covered. A
+  soft hyphen is removed.
+- A semicolon that was made full-width counts for the five names of plain
+  HTML and for numbers (`&lt；br&gt；`, `五笔86&amp；98`, `&#8226；`).
+- Without any semicolon, `&nbsp` is a space unless a letter follows
+  (`占地&nbsp11公顷`). `&amp`, `&lt`, `&gt` and `&quot` in that form are what
+  the corpus left of an entity it cut off, mostly one escaped twice at the
+  end of a picture caption: `Can&amp` was `Can&amp;#39;t`, `Ch&amp奥松酒庄`
+  was `Ch&amp;acirc;teau`. They are removed; only an `&amp` between two
+  Latin words is an `&` (`Honey &amp Clover`). In front of a letter nothing
+  is touched: `AT&T`, `you&me`.
+- Seven names damaged in single articles are read as what they stand for:
+  `&bsp;` and `&agmp;` (typing mistakes for `&nbsp;` and `&amp;`),
+  `Q&subm;` (the source's own mark for a subscript, shown as `Qm`), and
+  `&S226;` and `&O1548;`, which stand where `&#8226;` and `&#61548;` would
+  (the dot in `《新序》&S226;杂事第四》`, a list bullet). The last two are a
+  guess from the position.
 - The corpus cuts some texts in the middle of an entity (`也说“走背字儿&rdqu`).
   Such a stump is removed at the end of a summary or section text. Titles are
   left alone: `you&me` and `m&ms` are names.
@@ -312,10 +327,56 @@ one in the info table.
 
 6,971 of 4.88 M records had an entity (12,498 entities, 272 different ones;
 6,132 in summaries, 695 in info tables, 239 in sections, 144 in titles).
-8 records still have one: names nobody knows (`&O1548;`, `&subs;`, `&bsp;`)
-and one text that was escaped seven times. 177 names written without a
-semicolon are left as well (`&amp大唐`, `&nbsp11`, `&lt；br&gt；`); only
-`&nbsp` is read that way, and only when no letter or digit follows it.
+One record still has something of that shape, and it is text: `上海&ALICE;&蓬莱`.
+Five records whose whole summary was a cut-off caption (`海贼波琪&amp英文名：Porche`)
+are no longer entries.
+
+### Layout tags and private-use characters
+
+Two more things stand in the 2019 text where characters should, and go the
+same way as the entities, in the same first step.
+
+**Tags.** The corpus kept some of the page's layout as text:
+`…的实力企业。<br> 吉顺号在云南省…`, `<p> 《三国群星传》是…`,
+`耕地1241</SPAN>亩`. In body text (summaries, sections, info tables) these
+are taken out; a tag that broke a line leaves a space.
+
+- Only layout tags: `br`, `p`, `div`, `li`, `span`, `strong`, `em`, `font`,
+  `sup`, `sub`, `wbr`, `iframe`, `noinclude`, and `a` with an attribute.
+  `<a>`, `<b>`, `<i>` and `<u>` only as a pair, because `字母<u>` is a letter.
+- An attribute has to be `name=value`: `<A Year Without Rain>` is an album and
+  `<li quan>` a reading. `<stdio.h>`, `<math>` and the like are text.
+- A text about markup keeps its tags (`以<li>开始</li>结束`): one that says
+  `HTML`, `标签`, `元素`, `超文本`, `控件` or `字母` is left alone.
+- Titles are left alone.
+
+**Private-use characters.** A character from U+E000 to U+F8FF means something
+only in the font or encoding it was typed in, and shows as a box or as
+nothing.
+
+- GB 18030-2000 had 80 characters there that have code points of their own
+  now: `口眼㖞斜`, `奕䜣`, `芎䓖`, `康䶮`, and the parts `⺮`, `𠂇`, `𢦏`, `龹`
+  on pages about characters. These are mapped, in titles too.
+- Text pasted from a word processor has the letters of its symbol fonts at
+  U+F000 plus their place in the font. Most are list bullets and become a
+  space. A few are signs, read as such where the text around them says so:
+  `DS≥2.75`, `μC/OS-II`, `100）μm`, `聚α烯烃`, `NF-κB`, `ΔIB`, `阿法根®`,
+  `约翰斯·霍普金斯`, the font's own comma.
+- Any other one is a character the text has and cannot show. It becomes `□`,
+  the usual mark for that: `其上独有云气，□兮直上`. A run of them in front of
+  a text goes, and so do two code points seen only between sentences.
+- A title loses the ones at its ends (`开元十四年碑`, `铁书刀`) and keeps one
+  inside it as it is (a name with a rare character).
+
+A letter-spaced overlay snapshot is put back together before either rule
+touches it: with one tag or character less it is no longer every other
+character.
+
+311 texts had a layout tag, and 274 body texts and 22 titles a private-use
+character. No body text has one now; five titles keep one inside them. Of
+the layout tags, 11 are left outside texts about markup: 7 unpaired or
+broken ones (`</B>`, `<p zdct3">`) and 4 in texts that say `元素` or `标签`
+about something else.
 
 ### Sections of pages about words
 
@@ -373,6 +434,44 @@ are the pronunciation sections: the reading field has that.
   speech stays as `名词：`, and `典故`, `故事`, `歇后语` and `灯谜` parts are
   not shown. `辨析` sections that hold only `【近义词】…【反义词】…` come out
   as those two lists.
+- **Headings with nothing to mark them.** `作谓语、定语；多指婚姻示例但～，一生至一死`
+  has its heading glued to the text on both sides, and `示例`, `出处` and
+  `用法` are ordinary words too (`出处不详`, `用法近似`, `古文示例`). Such a
+  word counts as a heading only where the text around it shows one:
+  - `示例`, `例句` and `例子` anywhere in a `用法` text, which is a formula
+    (`联合式；作谓语；含贬义`), and after the end of a sentence in any text.
+    Not after a sentence on the page of a single character, which lists its
+    compounds, each with an example and the next compound behind it; and
+    `例子；榜样` is a meaning.
+  - In a list of synonyms, `反义词` and whatever shows the list is over
+    (`阳春白雪反义词下里巴人成语出处战国·楚·宋玉…`). A list of synonyms has
+    no brackets and no colons, so anything of that kind ends it:
+    `唇枪舌剑 【使用程度】常用成语`, `瞌睡、小憩 【英文】：doze off`,
+    `半途而废 英语翻译：…`, and the words `相关词`, `感情色彩`, `常用程度`,
+    `同韵词`, `英文翻译` with or without them. What follows is left out, unless
+    the heading names a label: `【相反词】明锐、足智多谋` are antonyms. A
+    source mark (`近义词[1] 不可名状`) is no heading, and in front of a list
+    nothing ends it: `确数：确数就是准确的数…` and
+    `霎时：短时间，一会儿。马上：副词…`, which explain each synonym, are left
+    as they are.
+  - `示例` and `例句` with a colon or in brackets after any character
+    (`正确，合适例句：方法对头，效率就高`, `偏正式 [例句] 水珠儿附着在…`),
+    and without either in a meaning when the headword or `～` comes after it
+    (`强壮而勇猛；强悍示例粗犷彪悍。`). Not `欧洲书牍示例》` (a title),
+    `解释与示例` (a heading of the senses) or `提供示例` (a sentence).
+  - `出处` after a sentence when a source follows: a `《book》`, an author
+    with a dynasty (`清·李宝嘉`), `语出`, or the first of a numbered list.
+    `用法` after a sentence when its formula follows.
+  - A heading right after the headword (`插入示例插入词语`,
+    `言归于好运用示例西晋·陈寿…`); the headword goes with it when it starts
+    a sentence. `铸铁管用法兰固定` is `用` and `法兰`: `用法` needs its formula
+    here as well.
+  - The compounds `成语出处`, `词语示例` and the like.
+  - At the start of a text, the headword with the section's own heading
+    again (`垃圾释义 “垃”字从土从立`) is dropped.
+
+  A heading the page spaced out inside brackets (`【释 义】`, `【出 处】`) and
+  headings in `『…』` or `〔…〕` are read like the others.
 - **Nothing twice.** The record keeps one section per label, at most 200
   characters each (`sections`, see *Record format*). The build leaves out a
   section the summary already says (the same text, or half of its character
@@ -383,22 +482,25 @@ are the pronunciation sections: the reading field has that.
   a section ends where such a list starts (臆, 徘); when the list comes first,
   in the first three lines, the text starts after it (娱); a section that is
   only such a list is skipped. 仓颉 the man and 《仓颉篇》 are not codes. The
+  caption of a picture of the character, which the corpus left in the text,
+  is taken out (`田字格中的“浩”字`, `田字格 长`, `田字格中的简体字‘过’`,
+  `“旦”在米字格中的书写`, and on the page of a single character
+  `书法“浩”字`). The
   flattened header of a table of senses is cut off, a line drawn across the
   page (`--------`) is dropped, and a list of 成语 written without anything
   between them is split every four characters.
 
-120,991 records carry sections (90,197 of the 2019 corpus, 44,473 of the
-overlay before the merge). After leaving out what the summary says, 76,251
-senses of the full dictionary (1.6%) and 28,971 of the lexical one (28%) show
-some: 释义 43,951, 出处 26,448, 详解 16,461, 示例 11,447, 用法 4,968, 近义词
-4,587, 反义词 2,597, 辨析 1,149. The full zip grows by 20 MB (1.4%), the
+121,077 records carry sections (90,200 of the 2019 corpus, 44,608 of the
+overlay before the merge). After leaving out what the summary says, 76,396
+senses of the full dictionary (1.6%) and 29,040 of the lexical one (28%) show
+some: 释义 43,948, 出处 26,572, 详解 16,460, 示例 13,320, 用法 5,106, 近义词
+4,654, 反义词 2,673, 辨析 1,143. The full zip grows by 20 MB (1.4%), the
 lexical one from 28 MB to 36 MB.
 
-Not handled: a heading glued between two characters with nothing to mark it
-(`多指婚姻示例但～，一生至一死`) stays in the text, a meaning that follows
-`例句：` on later lines goes under 示例, and about twenty character pages
-whose meaning follows a `田字格中的“长”字` caption lose that section (the
-summary and the 详解 section remain).
+Not handled: a meaning that follows `例句：` on later lines goes under 示例;
+where a page gives its senses with their quotations under `出处`, they are
+shown under that label; and a list that explains each of its synonyms
+(`内人：屋内之人的意思。…`) is shown with the explanations.
 
 ### Furniture of a dictionary site
 

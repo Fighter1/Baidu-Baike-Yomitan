@@ -12,7 +12,7 @@ import urllib.parse
 from typing import Iterator
 
 from .cleaning import (SAME_ARTICLE, clean_text, clean_title, decode_entities, short_summary_keep_reason, similarity,
-                       summary_drop_reason, title_drop_reason, trim_summary)
+                       summary_drop_reason, title_drop_reason, trim_summary, without_markup)
 from .junk import injected, known_headings
 from .records import Record, RecordWriter
 from .sections import pick_sections
@@ -294,13 +294,15 @@ def convert(row: dict, stats: collections.Counter, max_summary_chars: int,
     if reason:
         stats["drop:" + reason] += 1
         return None
-    content = decode_entities(row.get("content") or "")
+    content = decode_entities(row.get("content") or "", only_entities=True)
     flags = []
     recovered = plain = None
     if is_obfuscated(content):
         # A letter-spaced snapshot. Its text can be put back together, but it
         # is kept only when it has an introduction and no injected characters.
-        plain = decode_entities(unspace(content))
+        # Nothing may be taken out of it before that: a tag or a private-use
+        # character less, and it is no longer every other character.
+        plain = decode_entities(unspace(content), body=True)
         recovered = spaced_opening(plain, title) if plain is not None else None
         if plain is None:
             stats["spaced:not_every_other_character"] += 1
@@ -313,6 +315,8 @@ def convert(row: dict, stats: collections.Counter, max_summary_chars: int,
             flags.append("obfuscated")
         else:
             flags += ["unspaced", "abstract_fallback"]
+    else:
+        content = without_markup(content, body=True)
     if is_disambiguation(content, title):
         stats["drop:disambiguation_page"] += 1
         return None

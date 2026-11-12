@@ -49,22 +49,140 @@ _STUB_WORDS = ("成语发音", "成语读音", "汉语拼音", "基本信息", "
 
 
 # HTML entities that the corpus kept as text: Universit&auml;t, 41-60m&sup2;, d&igrave;ngzhǐ.
-_ENTITY_RE = re.compile(r"&(?:#\d{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,12});")
-_BARE_NBSP_RE = re.compile(r"&nbsp(?![;A-Za-z0-9])", re.I)
+_ENTITY_RE = re.compile(r"&(?:#\d{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,12});"
+                        r"|&(?:#\d{1,7}|amp|lt|gt|quot|nbsp)；")     # &lt；br&gt；: a semicolon made full-width
+# The five names of plain HTML without a semicolon. &nbsp is a space (占地&nbsp11公顷). The others are what
+# the corpus left of an entity it cut off, mostly one escaped twice inside a caption: Can&amp of Can&amp;#39;t,
+# Ch&amp奥松酒庄 of Ch&amp;acirc;teau, 汤米&amp汤米是一位…, 云鹰&quot该船. They are removed, except an &amp
+# between two Latin words (Honey &amp Clover). Not in front of a letter, where it is a name (AT&T, you&me).
+_BARE_RE = re.compile(r"&(?:([Nn][Bb][Ss][Pp])(?![;；A-Za-z])|(amp(?![;；A-Za-z#])|(?:lt|gt|quot)(?![;；A-Za-z0-9#])))")
+_WORD_BEFORE_RE = re.compile(r"[A-Za-z0-9] ?$")
+_WORD_AFTER_RE = re.compile(r" [A-Za-z]")
 # An entity that the corpus cut off with the end of a text: 也说“走背字儿&rdqu. Not you&me, m&ms.
 _CUT_ENTITY_RE = re.compile(r"(?<![A-Za-z0-9])&([a-z]{3,8})$")
 _ENTITY_NAMES = tuple(name for name in html.entities.html5 if name.endswith(";"))
+MAX_ENTITY_PASSES = 12          # 木村井泓 has &amp;amp;amp;amp;amp;amp;amp;
 # Names that no browser knows, from a transliteration scheme for Sanskrit and Pali.
 _EXTRA_ENTITIES = {
     "amacron": "ā", "emacron": "ē", "imacron": "ī", "omacron": "ō", "umacron": "ū",
     "Amacron": "Ā", "Emacron": "Ē", "Imacron": "Ī", "Omacron": "Ō", "Umacron": "Ū",
     "ddotblw": "ḍ", "hdotblw": "ḥ", "ldotblw": "ḷ", "mdotblw": "ṃ", "ndotblw": "ṇ", "rdotblw": "ṛ",
     "sdotblw": "ṣ", "tdotblw": "ṭ", "mdotabv": "ṁ", "ndotabv": "ṅ",
+    # Damaged in the corpus, each in one article. Typing mistakes for &nbsp; and &amp; (五笔86&agmp;98):
+    "bsp": " ", "agmp": "&",
+    # a subscript the source marked its own way (用Q&subm;表示):
+    "subm": "m", "subs": "s", "sub1": "1",
+    # and two numbers whose "#" and first digit became a letter. A guess from where they stand: &#8226;
+    # between a book and its chapter (《新序》&S226;杂事第四》), &#61548;, a list bullet of a symbol font.
+    "S226": "•", "O1548": "",
 }
 
 
+# Tags of the page's layout that the corpus kept as text: 实力企业。<br> 吉顺号在云南省…, <p> 《三国群星传》是…,
+# 耕地1241</SPAN>亩. With an attribute only as name=value: <A Year Without Rain> is an album and <li quan> a
+# reading. <stdio.h>, <math> and the like are text.
+_TAG_END = r"(?:\s+[A-Za-z-]+\s*=[^<>]*|\s*/)?\s*>"
+_TAG_RE = re.compile(rf"</?(?:br|wbr|p|div|li|span|strong|em|font|sup|sub|iframe|noinclude){_TAG_END}"
+                     rf"|<a\s+[A-Za-z-]+\s*=[^<>]*>", re.I)
+# <a>, <b>, <i>, <u> only as a pair: 字母<u> is a letter
+_PAIRED_TAG_RE = re.compile(r"<([abiu])>(.*?)</\1>", re.I | re.S)
+# A page about markup means its tags: li 标签定义列表项目。以<li>开始</li>结束
+_ABOUT_MARKUP_RE = re.compile(r"html|标签|标识符|元素|字母|超文本|超链接|控件|<(?:body|head|ul|ol|table|script)\b", re.I)
+
+
+def strip_tags(text: str) -> str:
+    """Body text without the layout tags that the corpus kept as text. A tag
+    that broke a line leaves a space."""
+    bare = _PAIRED_TAG_RE.sub(r"\2", _TAG_RE.sub(" ", text)).replace("</a>", "").replace("</A>", "")
+    return text if bare == text or _ABOUT_MARKUP_RE.search(bare) else bare
+
+
+# Characters of the private-use area mean something only in the font or the encoding they were typed in.
+_PUA_RE = re.compile("[%s-%s]" % (chr(0xE000), chr(0xF8FF)))
+_PUA_LEAD_RE = re.compile(r"^(?:[%s-%s]\s*)+" % (chr(0xE000), chr(0xF8FF)))
+# GB 18030-2000 put these characters there; they have had code points of their own since (㖞 in 口眼㖞斜, 䜣 in
+# 奕䜣, 䓖 in 芎䓖, ⺮, 𠂇, 𢦏, 龹 as parts of characters).
+_GB18030_PUA = {
+    0xE815: 0x2E81, 0xE816: 0x20087, 0xE817: 0x20089, 0xE818: 0x200CC, 0xE819: 0x2E84, 0xE81A: 0x3473,
+    0xE81B: 0x3447, 0xE81C: 0x2E88, 0xE81D: 0x2E8B, 0xE81E: 0x9FB4, 0xE81F: 0x359E, 0xE820: 0x361A,
+    0xE821: 0x360E, 0xE822: 0x2E8C, 0xE823: 0x2E97, 0xE824: 0x396E, 0xE825: 0x3918, 0xE826: 0x9FB5,
+    0xE827: 0x39CF, 0xE828: 0x39DF, 0xE829: 0x3A73, 0xE82A: 0x39D0, 0xE82B: 0x9FB6, 0xE82C: 0x9FB7,
+    0xE82D: 0x3B4E, 0xE82E: 0x3C6E, 0xE82F: 0x3CE0, 0xE830: 0x2EA7, 0xE831: 0x215D7, 0xE832: 0x9FB8,
+    0xE833: 0x2EAA, 0xE834: 0x4056, 0xE835: 0x415F, 0xE836: 0x2EAE, 0xE837: 0x4337, 0xE838: 0x2EB3,
+    0xE839: 0x2EB6, 0xE83A: 0x2EB7, 0xE83B: 0x2298F, 0xE83C: 0x43B1, 0xE83D: 0x43AC, 0xE83E: 0x2EBB,
+    0xE83F: 0x43DD, 0xE840: 0x44D6, 0xE841: 0x4661, 0xE842: 0x464C, 0xE843: 0x9FB9, 0xE844: 0x4723,
+    0xE845: 0x4729, 0xE846: 0x477C, 0xE847: 0x478D, 0xE848: 0x2ECA, 0xE849: 0x4947, 0xE84A: 0x497A,
+    0xE84B: 0x497D, 0xE84C: 0x4982, 0xE84D: 0x4983, 0xE84E: 0x4985, 0xE84F: 0x4986, 0xE850: 0x499F,
+    0xE851: 0x499B, 0xE852: 0x49B7, 0xE853: 0x49B6, 0xE854: 0x9FBA, 0xE855: 0x241FE, 0xE856: 0x4CA3,
+    0xE857: 0x4C9F, 0xE858: 0x4CA0, 0xE859: 0x4CA1, 0xE85A: 0x4C77, 0xE85B: 0x4CA2, 0xE85C: 0x4D13,
+    0xE85D: 0x4D14, 0xE85E: 0x4D15, 0xE85F: 0x4D16, 0xE860: 0x4D17, 0xE861: 0x4D18, 0xE862: 0x4D19,
+    0xE863: 0x4DAE, 0xE864: 0x9FBB,
+}
+# Text pasted from a word processor has the letters of its symbol fonts at U+F000 plus their place in the
+# font. Greek letters and signs of the Symbol font that are no bullets in any font:
+_SYMBOL_FONT = {0xF061: "α", 0xF062: "β", 0xF06B: "κ", 0xF044: "Δ", 0xF0D2: "®", 0xF0E2: "®"}
+_SYMBOL_DOTS = (0xF0D7, 0xF09E, 0xF09F)         # 约翰斯·霍普金斯, 诺曼·福斯特
+_PUA_JUNK = (0xE004, 0xE5E5)                    # seen only between sentences and in front of a text
+MISSING_CHARACTER = "□"                         # what a text prints for a character it cannot
+
+
+def _is_han(ch: str) -> bool:
+    return "\N{CJK UNIFIED IDEOGRAPH-4E00}" <= ch <= "\N{CJK UNIFIED IDEOGRAPH-9FFF}"
+
+
+def _private_use(m: re.Match, title: bool) -> str:
+    code, text = ord(m.group(0)), m.string
+    before, after = text[m.start() - 1:m.start()], text[m.end():m.end() + 1]
+    if code in _GB18030_PUA:
+        return chr(_GB18030_PUA[code])
+    if code in _SYMBOL_FONT:
+        return _SYMBOL_FONT[code]
+    if 0xF020 <= code <= 0xF0FF:
+        if code == 0xF06D and (not after or after.isascii() and after.isalpha()):
+            return "μ"                          # μC/OS-II, 相对磁导率μ
+        if code == 0xF02C:                      # the comma of the font: 蜡烛工艺，塑胶玩具行业
+            return "，" if _is_han(before) else ""
+        if code == 0xF0B3 and after.isdigit():
+            return "≥"                          # DS≥2.75
+        if code == 0xF0B4 and before.isascii() and before.isalnum():
+            return "×"                          # 1×4光功分器
+        if code == 0xF02D and before.isdigit() and after.isdigit():
+            return "-"                          # 1982-1999年
+        if code == 0xF07E and before.isascii() and before.isalnum():
+            return "～"                         # 200km～700km
+        if _is_han(before) and _is_han(after):
+            if code in _SYMBOL_DOTS:
+                return "·"
+            if code >= 0xF080:                  # no letter of a symbol font: a character again (令尹□祁)
+                return m.group(0) if title else MISSING_CHARACTER
+        return " "                              # a bullet in front of a line: ● 蔡达建，男，…
+    if code in _PUA_JUNK:
+        return ""
+    return m.group(0) if title else MISSING_CHARACTER
+
+
+def private_use_as_text(text: str, title: bool = False) -> str:
+    """Characters of the private-use area as what they stand for where that
+    is known. In body text a run of them in front of the text goes, the rest
+    becomes □: a character the text has but cannot show. A title keeps the
+    ones inside it, and loses those at its ends."""
+    if not _PUA_RE.search(text):
+        return text
+    if not title:
+        text = _PUA_LEAD_RE.sub("", text)
+    text = _PUA_RE.sub(lambda m: _private_use(m, title), text)
+    if title:
+        text = _PUA_RE.sub("", text[:1]) + text[1:-1] + (_PUA_RE.sub("", text[-1:]) if len(text) > 1 else "")
+    return text
+
+
+def needs_decoding(text) -> bool:
+    return isinstance(text, str) and ("&" in text or "<" in text or bool(_PUA_RE.search(text)))
+
+
 def _entity(m: re.Match) -> str:
-    whole = m.group(0)
+    found = m.group(0)
+    whole = found[:-1] + ";"                # the full-width semicolon
     char = html.unescape(whole)
     if char != whole:
         return char
@@ -73,27 +191,62 @@ def _entity(m: re.Match) -> str:
         return _EXTRA_ENTITIES[name]
     lower = "&" + name.lower() + ";"        # &NBSP;, &DEG;
     char = html.unescape(lower)
-    return char if char != lower else whole
+    return char if char != lower else found
 
 
-def decode_entities(text: str | None, cut_off: bool = False) -> str | None:
+def _bare(m: re.Match) -> str:
+    if m.group(1):
+        return " "
+    text = m.string
+    between_words = (m.group(2) == "amp" and _WORD_BEFORE_RE.search(text, max(0, m.start() - 2), m.start())
+                     and _WORD_AFTER_RE.match(text, m.end()))
+    return "&" if between_words else ""
+
+
+def _without_cut_entity(text: str) -> str:
+    cut = _CUT_ENTITY_RE.search(text)
+    if cut and any(name.startswith(cut.group(1)) for name in _ENTITY_NAMES):
+        return text[:cut.start()]
+    return text
+
+
+def decode_entities(text: str | None, cut_off: bool = False, body: bool | None = None,
+                    only_entities: bool = False) -> str | None:
     """HTML entities as the characters they stand for, for raw text before any
     other rule sees it: &#91;2&#93; has to be [2] for the citation rule, and
-    d&igrave;ngzhǐ has to be dìngzhǐ to be read as pinyin. More than once,
-    because some are escaped two or three times (&amp;amp;nbsp;). A name nobody
+    d&igrave;ngzhǐ has to be dìngzhǐ to be read as pinyin. Until nothing
+    changes, because some are escaped several times (&amp;amp;nbsp;). A name nobody
     knows stays as it is. `cut_off`: the text is body text that the corpus may
-    have ended inside an entity; a title can end in &me."""
-    if not text or "&" not in text:
+    have ended inside an entity; a title can end in &me.
+
+    What else the raw text has instead of characters goes the same way
+    (without_markup), unless `only_entities` says not yet. `body`: the text
+    is body text, by default what `cut_off` says."""
+    if not text:
         return text
-    for _ in range(4):
+    if "&" in text:
+        text = _decoded(text, cut_off)
+    return text if only_entities else without_markup(text, cut_off if body is None else body)
+
+
+def without_markup(text: str, body: bool = False) -> str:
+    """The text without the tags of a page's layout (body text only) and with
+    its characters of the private-use area as text."""
+    if body and "<" in text:
+        text = strip_tags(text)
+    return private_use_as_text(text, title=not body)
+
+
+def _decoded(text: str, cut_off: bool) -> str:
+    for _ in range(MAX_ENTITY_PASSES):
         decoded = _ENTITY_RE.sub(_entity, text)
+        if cut_off:
+            decoded = _without_cut_entity(decoded)
+        decoded = _BARE_RE.sub(_bare, decoded)
         if decoded == text:
             break
         text = decoded
-    cut = _CUT_ENTITY_RE.search(text) if cut_off else None
-    if cut and any(name.startswith(cut.group(1)) for name in _ENTITY_NAMES):
-        text = text[:cut.start()]
-    return _BARE_NBSP_RE.sub(" ", text).replace("\u00ad", "")      # the soft hyphen shows nothing
+    return text.replace("\u00ad", "")      # the soft hyphen shows nothing
 
 
 def strip_citations(text: str) -> str:

@@ -1,5 +1,5 @@
 {
- "golden_checks": 50,
+ "golden_checks": 64,
  "headwords": 82060,
  "headwords_whose_first_sense_is_a_work": 1880,
  "headwords_with_a_work_above_another_sense": 62,
@@ -9,7 +9,7 @@
  "scope": "lexical",
  "senses": 104657,
  "senses_of_headwords_with_several": 34494,
- "senses_with_sections": 28971,
+ "senses_with_sections": 29040,
  "summaries_cut_inside_a_quote": 134,
  "summaries_starting_mid_list": 396,
  "summaries_that_say_nothing": 71

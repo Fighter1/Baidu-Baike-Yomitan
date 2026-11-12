@@ -65,7 +65,15 @@ _CODES_LINE_RE = re.compile(
     r"|(?:简体|繁体)?部首(?:】[：:]?|[：:])\s*[^\s，,；;]?|Uni[Cc]ode|U\+[0-9A-Fa-f]{4,5}|统一汉字|汉字(?:首尾|部件)分解")
 _BEFORE_CODES_RE = re.compile(r"[\s，,；;]*(?:[（(]\d+[）)]|[①-⒛]|\d+[.、．])?\s*[【〖\[]?$")
 # What else such a page lists around them
-_NOT_A_SENSE_RE = re.compile(r"田字格|(?:中文|英文)读音|姓名学|吉凶寓意|字意五行|分解查字|输入代码")
+_NOT_A_SENSE_RE = re.compile(r"(?:中文|英文)读音|姓名学|吉凶寓意|字意五行|分解查字|输入代码")
+# The caption of a picture of the character, which the corpus left in the text: 田字格中的“浩”字,
+# “旦”在米字格中的书写, “崾”字的田字格写法图. 往“米”字格的大字本上写 is a sentence.
+_CAPTION_START = r"在?[田米]字格[中里之]?的?"
+_CAPTION_FONT = r"[简繁宋楷]体字?"       # 田字格中的简体字‘过’, 田字格之宋体字
+_CAPTION_RE = re.compile(
+    rf"{_CAPTION_START}(?:(?:{_CAPTION_FONT})?\s*[“‘\"][^”’\"\s]{{1,8}}[”’\"]字?|{_CAPTION_FONT})"
+    r"|[“\"][^”\"\s]{1,8}[”\"]字?[在的][田米]字格(?:中的?)?(?:写法图?|书写)?")
+_SCRIPTS = "书法|行书|楷书|草书|隶书|篆书|小篆|金文|甲骨文"
 _LIST_OPENING_RE = re.compile(r"^基本信息\s*")
 _RULE_RE = re.compile(r"[-=—_]{6,}")       # a line drawn across the page
 _AFTER_CODE_RE = re.compile(r"^[\dA-Za-z+，,；;：:&\s画]*")
@@ -85,7 +93,7 @@ _GAP = r"[ \t\u00a0\u3000]*"
 _BOUNDARY = r"(?:^|(?<=[。！？”’）》；\s]))"
 _INLINE = (
     rf"{_BOUNDARY}{_GAP}[【〖\[]?(?P<colon>{_CJK_RUN})[】〗\]]?{_GAP}[：:]{_GAP}"
-    rf"|[【〖](?P<bracket>{_CJK_RUN})[】〗]"
+    rf"|[【〖『〔](?P<bracket>{_CJK_RUN})[】〗』〕]"
     rf"|{_BOUNDARY}{_GAP}(?P<bare>成文用法|运用示例|近义词|反义词|同义词)"
     rf"|(?<![的其之个种])(?P<anywhere>(?:基本|详细)(?:解释|释义|字义)|引证解释)")
 _INLINE_RE = re.compile(_INLINE)
@@ -118,13 +126,65 @@ _PART_OF_SPEECH_RE = re.compile(r"^(?:名词|动词|形容词|副词|代词|量�
 # What such an entry goes on with after the antonyms, and what tells a story.
 _LEFT_OUT_RE = re.compile(rf"^(?:歇后语|灯谜|谜语|{_WORD}?(?:典故|故事))$")
 # Headings that are too common on other pages to be the heading of a section, but head a part inside one.
-_INNER_ONLY = {"事例": "示例", "例子": "示例", "词性": "用法"}
+_INNER_ONLY = {"事例": "示例", "例子": "示例", "词性": "用法", "相反词": "反义词", "相似词": "近义词", "相近词": "近义词",
+               "近义": "近义词", "同义": "近义词", "反义": "反义词"}
 # After 词性 in a line: the kind of word (形容词; 叹词，单纯词; 贬义成语；古代成语; 联合式). What follows it is
 # the text again: 词性：形容词 痴呆 chīdāi 1．发呆；呆滞. 词性：由两个偏正短语“晨钟”与“暮鼓”组成 is no heading.
 _KIND_OF_WORD = r"(?:[\u4e00-\u9fff]{0,4}?(?:词|成语|短语|词组|俗语|谚语)|[\u4e00-\u9fff]{2,3}式|褒义|贬义|中性)"
 _KINDS_OF_WORD_RE = re.compile(rf"{_GAP}[：:]?{_GAP}({_KIND_OF_WORD}(?:[，、；,;/和或及 ]{{1,2}}{_KIND_OF_WORD})*)")
+# A heading with nothing in front of it to mark it, glued to the text on both sides. The words are also
+# plain words (出处不详, 用法近似, 古文示例), so each counts only where the text around it shows a heading:
+_HAN = _CJK_RUN.split("{")[0]
+# A spaced-out heading in brackets as well: 【释 义】：比喻忠诚不二。【出 处】：西汉·司马迁
+_SPACED_HEADING_RE = re.compile(
+    rf"(?:{_BOUNDARY}{_GAP}|(?<=[【〖\[]))((?:{_HAN}{_SPACE}{{1,3}}){{1,3}}{_HAN})(?={_SPACE}|[：:】〗\]])")
+_SENTENCE_END = "。！？”’）》；"
+_EXAMPLE_WORD = r"(?:运用|成语|词语)?(?:示例|例句|例子)"
+_NO_EXAMPLE = r"(?![的性是了与和；，、。;,])"      # 例子；榜样 is a meaning, 更显著的例子了 a sentence
+_FORMULA = rf"(?={_HAN}{{2,3}}式[；;，,]|作[主谓宾定状补]语)"        # what a 用法 text is: 联合式；作谓语、定语
+# ... in a 用法 text, which is a formula: 作谓语、定语；多指婚姻示例但～，一生至一死
+_GLUED_EXAMPLE_RE = re.compile(rf"(?<![的一个种些])(?:{_EXAMPLE_WORD}){_NO_EXAMPLE}")
+# ... what a source is given with: a book, an author with his dynasty, the first of several
+_CITES = (r"(?=语出|《|[（(]?[1１⑴①][）)、.．]|(?:先秦|春秋|战国|秦|西汉|东汉|汉|三国|魏|西晋|东晋|晋|南朝|北朝"
+          rf"|南北朝|隋|唐|五代|北宋|南宋|宋|辽|金|元|明|清|近代|现代|当代)[·・• ]?{_HAN}{{2,4}}[《：:])")
+# ... in a list of synonyms, where the next heading ends the list: 阳春白雪反义词下里巴人成语出处战国·楚·宋玉
+#     宠辱不惊的近义词是置之度外 is a sentence
+_GLUED_IN_LIST_RE = re.compile(
+    rf"(?<={_HAN})(?:(?<![的有无是为和与个])(?:近义词|反义词|同义词)(?!辨)|成语(?:出处|用法|示例|辨析)"
+    rf"|(?:用法|语法){_FORMULA}|出处{_CITES})"
+    rf"|(?:用法|语法|出处|示例|例句)(?=[：:])")
+# ... and what is no list any more: 有趣反义词严肃或正经相关词滑稽戏：一种…, 唇枪舌剑 【使用程度】常用成语,
+# 瞌睡、小憩 【英文】：doze off, 防患未然、未雨绸缪 未雨绸缪：绸缪：紧密缠缚. A list of synonyms has no brackets
+# and no colons, so in one any heading ends it; one that names no label is left out with what follows it.
+_LIST_END_RE = re.compile(
+    r"(?P<word>相关词[语组]?|感情色彩|常用程度|使用程度|同韵词|押韵词|英文翻译|英语翻译|英文解释|英译"
+    r"|成语(?:结构|例子|举例|谜语|正音|辨形)|产生年代|语法结构|开放分类)"
+    rf"|[【〖\[](?P<bracketed>(?=[^】〗\]]*{_HAN})[^】〗\]\s]{{1,10}})[】〗\]]"      # not [1], which marks a source
+    rf"|(?<=\s)(?P<coloned>{_CJK_RUN})(?=[：:])")      # 霎时：短时间，一会儿。马上：副词 explains each synonym
+# ... 示例 and 例句 with a colon after any character, and without one in a meaning when the word itself or ～
+# comes after it: 正确，合适例句：方法对头，效率就高, 强壮而勇猛；强悍示例粗犷彪悍。 Not 欧洲书牍示例》 (a title),
+# 解释与示例 (a heading of the senses), 提供示例 (a sentence).
+_EXAMPLE_KIND_RE = re.compile(
+    r"(?:造句|用法|相关|其他|词典|文章|名著|同义|反面|词语|成语|运用)?(?:示例|例句)(?![的性是了与和及都；，、。;,》」』])")
+_OPENING, _CLOSING = "[【〖〔『（(", "]】〗〕』）)"
+_CLOSED_RE = re.compile(r"\d{0,2}[\]】〗〕』）)]")
+_NO_EXAMPLE_AFTER = "的与和及上事出个为供下些该此本举有无如是在将把被从"
+# ... anywhere: 示例 and 例句 after a sentence (not on the page of a character, which lists its compounds, each
+# with an example), 出处 after one in front of a source, 用法 in front of its formula, and the compounds
+_GLUED_ANYWHERE_RE = re.compile(
+    rf"{_BOUNDARY}{_GAP}(?P<example>{_EXAMPLE_WORD}){_NO_EXAMPLE}"
+    rf"|{_BOUNDARY}{_GAP}(?P<source>出处){_CITES}"
+    rf"|{_BOUNDARY}{_GAP}(?P<usage>用法){_FORMULA}"
+    rf"|(?<![该此这本的])(?P<compound>(?:成语|词语)(?:出处|示例|用法)){_NOT_PROSE}")
+# ... right after the headword: 一发不可收拾出处清·李宝嘉, 插入示例插入词语, 言归于好运用示例西晋·陈寿
+# (铸铁管用法兰固定 is 用 and 法兰); at the start of a line any of the plain words, when the text stands under
+# that label anyway: 垃圾释义 “垃”字从土从立
+_AFTER_TITLE_RE = re.compile(
+    rf"(?:成语|词语)?(?:运用示例|成文用法|(?:示例|例句){_NO_EXAMPLE}|出处(?![不未无])|用法{_FORMULA}){_NOT_PROSE}")
+_AFTER_TITLE_AT_START_RE = re.compile(rf"(?:{_PLAIN}){_NOT_PROSE}(?![，。、；,;])")
 _STUB, _PART_OF_SPEECH, _LEFT_OUT = "stub", "part of speech", "left out"
 _MEANING = {"释义", "详解"}
+_NOT_MEANING = tuple(label for label in ORDER if label not in _MEANING)
 INNER_RANK = len(_HEADING_RES) + 1      # a part found inside a section gives way to a section of that name
 
 # 汉典 pages pasted into Baike bring that site's furniture along: its name in
@@ -219,6 +279,77 @@ def _join_spaced(line: str) -> str:
     return _SPACED_HEADING_RE.sub(joined, line)
 
 
+def _without_captions(text: str, title: str) -> str:
+    """The text of a section without the captions of pictures of the character."""
+    if "字格" in text and "字格" not in title:
+        text = _CAPTION_RE.sub(" ", text)
+        if title:       # 田字格中的苗2、形状像苗的, 田字格 长汉语拼音：cháng
+            text = re.sub(rf"{_CAPTION_START}(?:{_CAPTION_FONT})?[ \t]*{re.escape(title)}字?", " ", text)
+    if len(title) == 1 and title + "”" in text:     # 书法“浩”字（2）同本义; 岳飞草书“还我河山”巨匾 is a sentence
+        text = re.sub(rf"(?:中国)?(?:{_SCRIPTS})“{re.escape(title)}”字?", " ", text)
+    return text
+
+
+def _glued_headings(line: str, title: str) -> list[tuple[int, int, str, tuple | None, str | None]]:
+    """(start, end, word, labels, kind) of the headings in a line that nothing
+    marks (see _GLUED_EXAMPLE_RE). `labels`: the heading counts only in a text
+    under one of these. `kind`: what it heads when the word does not say so.
+    The headword in front of a heading goes with it when it starts a sentence:
+    漂亮出处鲜明；亮丽, but 能做到这个程度,真是不简单出处1. 单纯；不复杂."""
+    lists = tuple(_LIST_LABELS)
+    # what was left out behind a list can be followed by a heading again: 四分五裂常用程度：常用…用法：作谓语、定语
+    found = [(m.start(), m.end(), m.group(0), ("用法",), None) for m in _GLUED_EXAMPLE_RE.finditer(line)]
+    found += [(m.start(), m.end(), m.group(0), lists + (_LEFT_OUT,), None) for m in _GLUED_IN_LIST_RE.finditer(line)]
+    for m in _LIST_END_RE.finditer(line):
+        start, word = m.start(), m.group("word") or m.group("bracketed") or m.group("coloned")
+        if m.group("word"):
+            start -= line.endswith("的", 0, start)      # 悲愤填膺、拍手称快的英文翻译to clap one's hands
+            start = start - len(title) if title and line.endswith(title, 0, start) else m.start()
+        if m.group("bracketed"):                        # 【润匙去反义词】, with characters put into it
+            word = next((name for name in ("近义词", "反义词", "同义词") if word.endswith(name)), word)
+        found.append((start, m.end(), word, lists + (_LEFT_OUT,) if _inner(word) else lists, _LEFT_OUT))
+    for m in _EXAMPLE_KIND_RE.finditer(line):
+        start, end = m.start(), m.end()
+        before, after = line[start - 1:start], line[end:end + 1]
+        marked = after in ("：", ":")
+        if before and before in _OPENING:       # [例句] 水珠儿附着在窗子的玻璃上。【示例1】《后汉书·郎顗传》
+            closed = _CLOSED_RE.match(line, end)
+            if not closed:
+                continue
+            start, end, marked = start - 1, closed.end(), True
+        elif before in _NO_EXAMPLE_AFTER or (before.isascii() and before.isalnum()) or (after and after in _CLOSING):
+            continue
+        if marked:
+            found.append((start, end, "示例", _NOT_MEANING if len(title) == 1 else None, None))
+        elif len(title) > 1 and (title in line[end:] or "～" in line[end:]):
+            found.append((start, end, "示例", tuple(_MEANING), None))
+    for m in _GLUED_ANYWHERE_RE.finditer(line):
+        name = m.lastgroup
+        labels = _NOT_MEANING if name == "example" and len(title) == 1 else None
+        found.append((m.start(name), m.end(name), m.group(name), labels, None))
+    if not title:
+        return found
+
+    def fresh(at: int) -> bool:
+        return at == 0 or line[at - 1] in _SENTENCE_END or line[at - 1].isspace()
+
+    found = [(start - len(title) if line.endswith(title, 0, start) and fresh(start - len(title)) else start, *rest)
+             for start, *rest in found]
+    at = line.find(title)
+    while at >= 0:
+        after = at + len(title)
+        m = _AFTER_TITLE_RE.match(line, after)
+        if m:
+            found.append((at if fresh(at) else after, m.end(), m.group(0), None, None))
+        elif not line[:at].strip():
+            m = _AFTER_TITLE_AT_START_RE.match(line, after)
+            if m:
+                kind = _inner(m.group(0))       # 壮丽含义 1.健壮美丽 opens a 详细解释 section as well
+                found.append((at, m.end(), m.group(0), (kind, "详解") if kind == "释义" else (kind,), None))
+        at = line.find(title, after)
+    return found
+
+
 def _opens_with_heading(line: str, title: str) -> bool:
     text = line.lstrip()
     m = re.match(rf"{_WORD}?[：:]?\s*{re.escape(title)}\s*", text) if title else None
@@ -278,28 +409,35 @@ def _lines_by_label(raw: str, title: str, label: str) -> dict[str, list[str]]:
         pos = 0
         stub = stub or (i == 0 and run_together)        # 成语一无所获 in front of the first heading
         headword_line = i == 0 and not stub and bool(title and title in line)
+        found = []
         for m in headings.finditer(line):
             groups = m.groupdict()
             word = (groups.get("plain") or groups.get("leftout") or groups["colon"] or groups["bracket"]
                     or groups["bare"] or groups["anywhere"])
-            kind = _inner(word)
-            if kind is None or kind == _PART_OF_SPEECH or m.start() < pos:
+            found.append((m.start(), m.end(), word, None, None))
+        found = sorted(found + _glued_headings(line, title), key=lambda f: f[0])     # the marked one first
+        for start, end, word, labels, kind in found:
+            kind = _inner(word) or kind
+            if kind is None or kind == _PART_OF_SPEECH or start < pos or (labels and current not in labels):
                 continue
+            if kind == _LEFT_OUT and current in _LIST_LABELS and not parts[current] \
+                    and not clean_text(line[pos:start].lstrip("：: "), title):
+                continue        # in front of a list it is the list: 确数：确数就是准确的数, 【制造、捏造等】1、制造
             if word == "词性":
-                kinds = _KINDS_OF_WORD_RE.match(line, m.end())
+                kinds = _KINDS_OF_WORD_RE.match(line, end)
                 if kinds:
-                    add(line[pos:m.start()], stub, headword_line)
+                    add(line[pos:start], stub, headword_line)
                     headword_line = stub = False
                     parts.setdefault("用法", []).append(kinds.group(1))
                     pos = kinds.end() + len(line[kinds.end():]) - len(line[kinds.end():].lstrip("。，,；; "))
                 continue
-            add(line[pos:m.start()], stub, headword_line)
+            add(line[pos:start], stub, headword_line)
             headword_line, stub = False, kind == _STUB
             if stub:
-                pos = m.start()     # 拼音：guò mǐn goes; of 拼音：bái ái ái形容非常洁白 the reading goes
+                pos = start         # 拼音：guò mǐn goes; of 拼音：bái ái ái形容非常洁白 the reading goes
             else:
                 turn(kind)
-                pos = m.end()
+                pos = end
         add(line[pos:], stub, headword_line)
     return parts
 
@@ -310,7 +448,7 @@ def section_parts(content: str | None, title: str, label: str) -> list[list[str]
     示例 …, one to a line, and gives a 详解, a 出处 and a 示例 part. Each text
     is one cleaned line of at most MAX_SECTION_CHARS; a part that says
     nothing (empty, or only the title's pinyin) is left out."""
-    raw = strip_pasted_furniture(content)
+    raw = _without_captions(strip_pasted_furniture(content), title)
     parts = [[name, _text(lines, title, name)] for name, lines in _lines_by_label(raw, title, label).items()
              if name != _LEFT_OUT]
     parts = [part for part in parts if part[1] and not _ONLY_HEADINGS_RE.match(part[1])]

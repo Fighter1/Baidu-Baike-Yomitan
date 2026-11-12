@@ -203,6 +203,114 @@ def test_html_entities_become_characters():
     assert decode_entities("也说“走背字儿&rdqu") == "也说“走背字儿&rdqu"        # a title is not cut
 
 
+def test_entities_without_a_semicolon_and_damaged_ones():
+    assert decode_entities("MM(MCJH&" + "amp;" * 7 + "TWJ)") == "MM(MCJH&TWJ)"          # escaped seven times
+    assert decode_entities("占地&nbsp11&nbsp78公顷，2台&NBSP31.5MVA") == "占地 11 78公顷，2台 31.5MVA"
+    # what is left of an entity that the corpus cut off, mostly at the end of a caption
+    assert decode_entities("汤米&amp汤米是一位社会企业家") == "汤米汤米是一位社会企业家"
+    assert decode_entities("Club Can&amp迪士尼打造的，油画《金云翘传》Kim V&amp") == "Club Can迪士尼打造的，油画《金云翘传》Kim V"
+    assert decode_entities("周信芳,周五宝&amp 著名的京剧剧目，篱笆边&amp1、治肺热") == "周信芳,周五宝 著名的京剧剧目，篱笆边1、治肺热"
+    assert decode_entities("“云鹰&quot该船，温州特产 &gt分别，集数：14）&lt") == "“云鹰该船，温州特产 分别，集数：14）"
+    assert decode_entities("Honey &amp Clover, Kit&amp Bee") == "Honey & Clover, Kit& Bee"      # between Latin words
+    assert decode_entities("一统天下.&lt；br&gt；九五至尊，五笔86&amp；98&#91；2&#93；") == "一统天下.<br>九五至尊，五笔86&98[2]"
+    assert decode_entities("&bsp;&bsp;序言，五笔86&agmp;98，用Q&subm;表示") == "  序言，五笔86&98，用Qm表示"
+    assert decode_entities("《新序》&S226;杂事第四》，应用领域 &O1548;空分制氮") == "《新序》•杂事第四》，应用领域 空分制氮"
+    for text in ("AT&T", "R&amplifier", "guitar&amps", "A&LT集团", "s&gt5", "you&me；", "Q&A；", "上海&ALICE;&蓬莱",
+                 "&nbspace", "&subx;", "&amp#x"):
+        assert decode_entities(text) == text and decode_entities(text, cut_off=True) == text
+
+
+def test_layout_tags_in_body_text():
+    def body(text):
+        return decode_entities(text, cut_off=True)
+
+    assert body("完全可信赖的实力企业。<br> 吉顺号在云南省<BR>西双版纳，<br />易武") == "完全可信赖的实力企业。  吉顺号在云南省 西双版纳， 易武"
+    assert body("耕地1241</SPAN>亩。<FONT color=#c60a00>俞颖</FONT>传") == "耕地1241 亩。 俞颖 传"
+    assert body("<A href=\"http://example.com/1.htm\">果糖代谢紊乱</a>，教您<a>怎么做冬菇鸡冻</a>") == " 果糖代谢紊乱，教您怎么做冬菇鸡冻"
+    assert body("一统天下.&lt；br&gt；九五至尊") == "一统天下. 九五至尊"      # a tag that was escaped
+    for text in ("专辑<A Year Without Rain>的首支单曲", "#include <stdio.h>", "醴泉 <li quan> 释名", "形式如<math>(2^p+1)/3</math>的质数",
+                 "li 标签定义列表项目。以<li>开始</li>结束", "nl2br() 函数插入 HTML 换行符 (<br />)。", "<b> 《现场安全员岗位通》",
+                 "意思是超文本引用。1.内部连接：<a href=\"#/URL\">name</a>"):
+        assert body(text) == text
+    assert decode_entities("<p>标题</p>") == "<p>标题</p>"         # a title is left alone
+
+
+def test_characters_of_the_private_use_area():
+    def body(text):
+        return decode_entities(text, cut_off=True)
+
+    def pua(code):
+        return chr(code)
+
+    # GB 18030-2000 had these there
+    assert body("口眼" + pua(0xE81F) + "斜，字从“" + pua(0xE83B) + "”，芎" + pua(0xE840) + "，写成“" + pua(0xE836) + "”") == \
+        "口眼㖞斜，字从“𢦏”，芎䓖，写成“⺮”"
+    assert decode_entities("慈禧奕" + pua(0xE844) + "政变记") == "慈禧奕䜣政变记" and decode_entities(pua(0xE816)) == "𠂇"
+    # letters of a symbol font: a bullet, or a sign where the text around it says so
+    assert body("个人简历" + pua(0xF06C) + " 蔡达建，男。" + pua(0xF0B2) + "现场管理咨询") == "个人简历  蔡达建，男。 现场管理咨询"
+    assert body("DS" + pua(0xF0B3) + "2.75，结合" + pua(0xF06D) + "C/OS-II，100）" + pua(0xF06D) + "m，聚" + pua(0xF061) + "烯烃") == \
+        "DS≥2.75，结合μC/OS-II，100）μm，聚α烯烃"
+    assert body("蜡烛工艺" + pua(0xF02C) + "塑胶玩具行业，" + pua(0xF02C) + "礼品文具行业") == "蜡烛工艺，塑胶玩具行业，礼品文具行业"
+    assert body("约翰斯" + pua(0xF0D7) + "霍普金斯大学，移主" + pua(0xF06D) + "（藏）郎中") == "约翰斯·霍普金斯大学，移主 （藏）郎中"
+    assert body("阿法根" + pua(0xF0D2) + "，1982" + pua(0xF02D) + "1999年，200km" + pua(0xF07E) + "700km") == "阿法根®，1982-1999年，200km～700km"
+    # a character the text has and cannot show
+    assert body("其上独有云气，" + pua(0xF4CE) + "兮直上，令尹" + pua(0xF091) + "祁，亦作\"峣" + pua(0xE422) + "\"") == \
+        "其上独有云气，□兮直上，令尹□祁，亦作\"峣□\""
+    # nothing: in front of a text, and the two seen only between sentences
+    assert body(pua(0xE817) * 2 + "氢化亚铜(CuH)是铜的二元化合物。") == "氢化亚铜(CuH)是铜的二元化合物。"
+    assert body("安徽人。" + pua(0xE004) + "1977年毕业于蚌埠医学院。") == "安徽人。1977年毕业于蚌埠医学院。"
+    # a title keeps the ones inside it and loses those at its ends
+    assert decode_entities("开元十四年碑" + pua(0xE004)) == "开元十四年碑" and decode_entities(pua(0xE814) + "故城北大医院") == "故城北大医院"
+    assert decode_entities("相对磁导率" + pua(0xF06D)) == "相对磁导率μ"
+    assert decode_entities("赵" + pua(0xE7FE) + "庆") == "赵" + pua(0xE7FE) + "庆"
+
+
+def test_what_follows_a_list_of_synonyms():
+    for text, title, label, want in (
+            ("唇枪舌剑 【使用程度】常用成语 【感情色彩】中性成语 【产生年代】古代成语", "促膝谈心", "反义词", [["反义词", "唇枪舌剑"]]),
+            ("瞌睡、小憩 【英文】：doze off", "打盹", "近义词", [["近义词", "瞌睡、小憩"]]),
+            ("虎头蛇尾、有头无尾、半途而废 英语翻译：Do difficult things by an old person", "愚公移山", "反义词",
+             [["反义词", "虎头蛇尾、有头无尾、半途而废"]]),
+            ("防患未然、未雨绸缪 未雨绸缪：绸缪：紧密缠缚。天还没有下雨，先把门窗绑牢。", "曲突徙薪", "近义词", [["近义词", "防患未然、未雨绸缪"]]),
+            ("愚不可及、【相反词】明锐、足智多谋、【同韵词】事无三不也、抱打不平", "冥顽不灵", "近义词",
+             [["近义词", "愚不可及"], ["反义词", "明锐、足智多谋"]]),
+            ("椎胸跌足、椎膺顿足 常用程度：一般 感情色彩：贬义词 语法", "椎胸顿足", "近义词", [["近义词", "椎胸跌足、椎膺顿足"]]),
+            ("措施、法子、对策", "方法", "近义词", [["近义词", "措施、法子、对策"]]),
+            (" 近义词[1] 不可名状  ", "莫可名状", "辨析", [["近义词", "不可名状"]]),        # a source mark is no heading
+            (" 确数：确数就是准确的数。单个的数字也是确数。", "概数", "反义词", [["反义词", "确数：确数就是准确的数。单个的数字也是确数。"]]),
+            ("大概的数。反义词 确数：确数就是准确的数。单个的数字也是确数。", "概数", "释义",
+             [["释义", "大概的数。"], ["反义词", "确数：确数就是准确的数。单个的数字也是确数。"]]),
+            ("四分五裂常用程度：常用感情色彩：褒义词语法用法：作谓语、定语；指一个整体。", "不可分割", "反义词",
+             [["反义词", "四分五裂"], ["用法", "作谓语、定语；指一个整体。"]]),
+            (" 【近义词】：赤胆忠心、忠贞不渝 【润匙去反义词】： 虚与委蛇、假仁假义[1]  ", "忠心耿耿", "辨析",
+             [["近义词", "赤胆忠心、忠贞不渝"], ["反义词", "虚与委蛇、假仁假义"]]),
+            (" 【近义词】：[1] 食不二味、食不兼味 【反义词】：大吃大喝、食案方丈", "食不重味", "辨析",
+             [["近义词", "食不二味、食不兼味"], ["反义词", "大吃大喝、食案方丈"]]),
+            ("近义词：美丽、漂亮；反义词：丑陋", "好看", "近义词", [["近义词", "美丽、漂亮"], ["反义词", "丑陋"]])):
+        assert section_parts(text, title, label) == want
+
+
+def test_an_example_glued_to_a_meaning():
+    assert section_parts("强壮而勇猛；强悍示例粗犷彪悍。", "彪悍", "详解") == [["详解", "强壮而勇猛；强悍"], ["示例", "粗犷彪悍。"]]
+    assert section_parts("使别人得到；给示例母亲，你给予了我生命。", "给予", "详解") == [
+        ["详解", "使别人得到；给"], ["示例", "母亲，你给予了我生命。"]]
+    assert section_parts("没有错误；正确，合适例句：方法对头，效率就高。", "对头", "详解") == [
+        ["详解", "没有错误；正确，合适"], ["示例", "方法对头，效率就高。"]]
+    assert section_parts("掌文庙祭祀、教育所属生员。用法示例：南平教谕。——清·张廷玉", "教谕", "释义") == [
+        ["释义", "掌文庙祭祀、教育所属生员。"], ["示例", "南平教谕。——清·张廷玉"]]
+    assert section_parts("(动)较小的物体黏着在较大的物体上。[构成] 偏正式 [例句] 水珠儿附着在窗子的玻璃上。", "附着", "释义") == [
+        ["释义", "(动)较小的物体黏着在较大的物体上。[构成] 偏正式"], ["示例", "水珠儿附着在窗子的玻璃上。"]]
+    assert section_parts("(1).厚缯制成之袍。【示例1】《后汉书·郎顗传》：“故孝文皇帝绨袍革舃。”", "绨袍", "释义") == [
+        ["释义", "(1).厚缯制成之袍。"], ["示例", "《后汉书·郎顗传》：“故孝文皇帝绨袍革舃。”"]]
+    for text, title, label in (
+            ("有所遗憾【例句及翻译】：1. 不无遗憾的是，我们中的大部分人生来就只吃某几种食品。", "不无遗憾", "释义"),
+            ("朱光潜《艺文杂谈·欧洲书牍示例》：“罗马在鼎盛时代，文艺也鼎盛。”", "鼎盛", "详解"),       # a title
+            ("yī解释与示例（1）美盛貌。《诗经》：“瞻彼淇奥，绿竹猗猗。”", "猗猗", "释义"),             # a heading of the senses
+            ("这里提供示例说明教谕的职责，教谕负责教育生员。", "教谕", "释义"),                          # a sentence
+            ("创：创新之能弈：博弈之道工：天工之作场：浩然之气例句创新之能：不墨守成规。", "创弈工场", "释义")):    # no example of the word
+        assert section_parts(text, title, label) == [[label, text]]
+
+
 def test_entities_are_decoded_before_the_other_rules():
     stats = collections.Counter()
     raw = {"title": "两岭乡&#8226;甲", "summary": "两岭乡位于山阳县城东北部，平均气温在7.1&ordm;C。&#91;1&#93;", "tags": [],
@@ -381,6 +489,81 @@ def test_more_about_codes_and_kinds_of_word():
     assert section_text(sen, "森", "释义") == "造字法：会意本义：树木丛生繁密"
     assert section_parts("词性：动词。遗失票据或证件时，到原发的机关去登记，声明作废。", "挂失", "释义") == [
         ["释义", "遗失票据或证件时，到原发的机关去登记，声明作废。"], ["用法", "动词"]]
+
+
+def test_a_heading_glued_to_the_text_on_both_sides():
+    # in a 用法 text, which is a formula
+    assert section_parts("作谓语、定语；多指婚姻示例但～，一生至一死，非同儿戏。", "终身大事", "用法") == [
+        ["用法", "作谓语、定语；多指婚姻"], ["示例", "但～，一生至一死，非同儿戏。"]]
+    assert section_parts("作谓语，也作定语、补语，含贬义。赔了夫人又折兵运用示例明·冯梦龙《醒世恒言》：“周瑜妙计安天下。”",
+                         "赔了夫人又折兵", "用法") == [
+        ["用法", "作谓语，也作定语、补语，含贬义。"], ["示例", "明·冯梦龙《醒世恒言》：“周瑜妙计安天下。”"]]
+    assert section_parts("补充式；作谓语、定语；含贬义。示例 1、倒卖假冒伪劣产品的商贩已经到了～的地步。", "肆无忌惮", "用法") == [
+        ["用法", "补充式；作谓语、定语；含贬义。"], ["示例", "1、倒卖假冒伪劣产品的商贩已经到了～的地步。"]]
+    # in a list of synonyms the next heading ends the list
+    assert section_parts("阳春白雪反义词下里巴人成语出处战国·楚·宋玉《对楚王问》：“引商刻羽，杂以流徵。”", "曲高和寡", "近义词") == [
+        ["近义词", "阳春白雪"], ["反义词", "下里巴人"], ["出处", "战国·楚·宋玉《对楚王问》：“引商刻羽，杂以流徵。”"]]
+    assert section_parts("不骄不躁、虚怀若谷反义词骄傲自大、不可一世用法作谓语、宾语；指人要谦虚", "戒骄戒躁", "近义词") == [
+        ["近义词", "不骄不躁、虚怀若谷"], ["反义词", "骄傲自大、不可一世"], ["用法", "作谓语、宾语；指人要谦虚"]]
+    assert section_text("说明出处、阐明用法", "注明", "近义词") == "说明出处、阐明用法"
+    # after a sentence: 示例, and 出处 in front of a source
+    assert section_parts("指贪心重，无法满足。出处语出《国语·晋语八》：“谿壑可盈，是不可餍也。”", "欲壑难填", "释义") == [
+        ["释义", "指贪心重，无法满足。"], ["出处", "语出《国语·晋语八》：“谿壑可盈，是不可餍也。”"]]
+    assert section_parts("虽苦楚万端，对之自若。”示例为了这一刻,他经受了多少苦楚。", "苦楚", "出处") == [
+        ["出处", "虽苦楚万端，对之自若。”"], ["示例", "为了这一刻,他经受了多少苦楚。"]]
+    # right after the headword
+    assert section_parts("1.放入、挤入、刺入、穿入；加进去。插入示例插入词语| 插入图片", "插入", "详解") == [
+        ["详解", "1.放入、挤入、刺入、穿入；加进去。"], ["示例", "插入词语| 插入图片"]]
+    assert section_text("垃圾释义 “垃”字从土从立，“土”即土块、土粒。", "垃圾", "释义") == "“垃”字从土从立，“土”即土块、土粒。"
+    assert section_parts("能做到这个程度,真是不简单出处1. 单纯；不复杂。茅盾《宿莽》：“事务又简单。”", "简单", "详解") == [
+        ["详解", "能做到这个程度,真是不简单"], ["出处", "1. 单纯；不复杂。茅盾《宿莽》：“事务又简单。”"]]
+    # what follows a list of synonyms and has no label
+    assert section_text("把酒持螯、持螯把盏英文翻译 enjoy a cup of wine 常用程度：一般感情色彩：褒义词", "持螯把酒", "近义词") == \
+        "把酒持螯、持螯把盏"
+    assert section_text("肝肠寸断、天怒人怨、拍手称快的英文翻译to clap one's hands", "拍手称快", "反义词") == "肝肠寸断、天怒人怨"
+    # a spaced-out heading in brackets, and other brackets
+    assert section_parts("【释 义】：比喻忠诚不二。\n【出 处】：西汉·司马迁《史记》：“剖心坼肝相信。”", "剖心坼肝", "释义") == [
+        ["释义", "比喻忠诚不二。"], ["出处", "西汉·司马迁《史记》：“剖心坼肝相信。”"]]
+    assert section_parts("『解释』相传鹏鸟能飞万里路程。『出处』《庄子·逍遥游》：“鹏之徙于南冥也。”", "鹏程万里", "释义") == [
+        ["释义", "相传鹏鸟能飞万里路程。"], ["出处", "《庄子·逍遥游》：“鹏之徙于南冥也。”"]]
+    # the page of a character lists its compounds, each with an example: the next one is no example
+    mi = "迷糊míhu 神志或眼睛模糊不清。例句奶奶病得很重，有时迷糊。迷惑 míhuò ①辨不清是非；摸不着头脑。"
+    assert section_parts(mi, "迷", "释义") == [["释义", mi]]
+    # the same words in a sentence
+    for text, title, label in (
+            ("例子；榜样。元关汉卿《窦娥冤》第二折：“都看取我这般傍州例。”", "傍州例", "释义"),
+            ("举例：在新颖独创方面很少有更显著的例子了。", "显著", "用法"),
+            ("铸铁管，用铸铁浇铸成型的管子。铸铁管用法兰固定，内垫橡胶法兰垫片密封；", "铸铁管", "释义"),
+            ("宠辱不惊的近义词是置之度外", "宠辱不惊", "近义词"),
+            ("“还我河山”出自岳飞庙内岳飞草书“还我河山”巨匾。", "还我河山", "出处"),
+            ("指父母对子女的教育虽然严厉，却是因为深爱孩子。出处是七八十年代的俗语。", "打是亲骂是爱", "释义"),
+            ("代表仁，义，礼，智，信五德，然而这种说法没有具体的出处。", "五色旗", "释义"),
+            ("朱光潜《艺文杂谈·欧洲书牍示例》：“罗马在鼎盛时代。”示例性的说明。", "鼎盛", "详解"),
+            ("“苍孙”和老炮儿在作为年长男性的称呼上用法近似，但并不侧重。", "老炮儿", "释义"),
+            ("司法解释是指国家最高司法机关对具体适用法律的问题作出的解释。", "司法解释", "释义")):
+        assert section_parts(text, title, label) == [[label, text]]
+
+
+def test_the_caption_of_a_picture_of_the_character():
+    chang = "  田字格 长汉语拼音：cháng\n(1) ㄔㄤˊ\n(2) 两端的距离：～度。\n(3) 长度大，与“短”相对：～短。"
+    assert section_text(chang, "长", "释义") == "(1) ㄔㄤˊ (2) 两端的距离：～度。(3) 长度大，与“短”相对：～短。"
+    assert section_text("田字格里的‘烦’◎ 苦闷，急躁：～躁。～乱。～恼。", "烦", "释义") == "◎ 苦闷，急躁：～躁。～乱。～恼。"
+    assert section_text("田字格“缝”（缝）féng ㄈㄥˊ ◎ 用针线连缀：缝纫。缝缀。", "缝", "释义") == "（缝）féng ㄈㄥˊ ◎ 用针线连缀：缝纫。缝缀。"
+    assert section_text("过程。过渡。经过。田字格中的简体字‘过’经过某种处理方法：过滤。", "过", "释义") == \
+        "过程。过渡。经过。经过某种处理方法：过滤。"
+    assert section_text("田字格之宋体字1）有土地、人民、主权的政体。", "国", "释义") == "1）有土地、人民、主权的政体。"
+    assert section_text("● 浩田字格中的“浩”字hàoㄏㄠˋ\n◎ 水大，引申为大和多：～大。～繁。", "浩", "释义") == \
+        "◎ 水大，引申为大和多：～大。～繁。"
+    assert section_text("〈名〉田字格中的“伍”字1、（会意。从人，从五。五人为伍。）2、同本义", "伍", "释义") == \
+        "〈名〉 1、（会意。从人，从五。五人为伍。）2、同本义"
+    assert section_text("“掽”在米字格中的写法同“碰”。", "掽", "释义") == "同“碰”。"
+    assert section_text("（1）（形声。本义：水势浩大)。书法“浩”字（2）同本义。浩，浇也。", "浩", "详解") == \
+        "（1）（形声。本义：水势浩大)。（2）同本义。浩，浇也。"
+    sentence = "细细揣摩，然后一笔一画，一丝不苟地往“米”字格的大字本上写。"
+    assert section_text(sentence, "一丝不苟", "示例") == sentence
+    assert section_text("田字格是一种练习写字的格子，用于规范汉字书写。", "田字格", "释义") == "田字格是一种练习写字的格子，用于规范汉字书写。"
+    # a page that lists nothing but how the character is written still gives nothing
+    assert section_text("基本信息诚 繁体字：诚 注音：ㄔㄥˊ 田字格中的“诚”字\n部首：讠\n笔画数：8", "诚", "释义") == ""
 
 
 def test_what_a_character_page_lists_around_the_codes():

@@ -593,3 +593,209 @@ instead of a kind of word stays in the text (晨钟暮鼓); summaries that open
 with `释义` or `出处` (海角天涯, 一无所获) — the summary rules were not
 touched; and, as before, an example or quotation as the summary where the
 meaning is short (about 1,150 entries have the meaning under 释义 instead).
+The first and the third of these, and the entities left over above, are done
+in the next section.
+
+## Second local build of 2026-11-11: leftover entities, captions, glued headings
+
+**Entities.** The 8 records and 177 bare names left above, looked at one by
+one:
+
+- `MM(MCJH&amp;amp;amp;TWJ)` was an `&` escaped seven times; the decoder
+  stopped after four passes. It now runs until nothing changes.
+- 135 bare `&amp` and 3 `&quot`: read in context, nearly all are what the
+  corpus left of an entity it cut off, usually one escaped twice at the end
+  of a picture caption that then runs into the summary (`Can&amp` of
+  `Can&amp;#39;t`, `Ch&amp奥松酒庄` of `Ch&amp;acirc;teau`, `汤米&amp汤米是一位…`).
+  Turning them into `&` would leave a stray `&`, so they are removed; only
+  between two Latin words is it an `&` (`Honey &amp Clover`).
+- 29 `&nbsp` in front of a digit (`占地&nbsp11公顷`) are spaces now.
+- 10 with a full-width semicolon (`&lt；br&gt；`, `五笔86&amp；98`).
+- `&bsp;`, `&agmp;`, `&subm;`/`&subs;`/`&sub1;`, `&S226;` (two articles, both
+  where a middle dot belongs), `&O1548;`: a small table. The last two are a
+  guess.
+
+Applied to the records of the build above, 160 change. After the rebuild one
+record has an entity-shaped piece left (`上海&ALICE;&蓬莱`, text) and no bare
+name is left. Six 2019 records are gone, five of them headwords: their whole
+summary was such a caption stump (`海贼波琪&amp英文名：Porche`); the sixth,
+`don't panic`, still has its overlay sense.
+
+Seen while looking, not touched: 315 records have literal tags in the text
+(`<br>` 157, `<p>` 131; pages about HTML among them), and 296 have characters
+from the private-use area, which show as boxes.
+
+**Captions.** `田字格` was on the list of things that make a section "not a
+sense", so 长, 浩, 伍, 娴 lost their 释义. The caption is now taken out
+instead. The first rebuild still showed `田字格长汉语拼音：cháng`: the raw text
+is `田字格 长`, with a space, and other pages say `田字格里的‘烦’`,
+`田字格中的简体字‘过’`, `田字格之宋体字`. After the second rebuild one is left
+(`熟，田字格四角号码:`). `书法“浩”字` is only taken out on the page of a single
+character: `岳飞草书“还我河山”巨匾` is a sentence.
+
+**Glued headings.** Counted on the records of the build above, by the label
+of the section, the heading word inside it and what stands in front of it:
+`示例` inside a 用法 text 1,761 times (908 after a sentence, 841 glued to a
+character), far ahead of everything else; `出处` after a sentence in a 释义
+or 详解 text about 100; `反义词` glued inside a list of synonyms 35. `解释`
+inside 释义 (1,287) is prose almost every time and is left alone.
+
+The 500,000-row trial on the 2019 corpus changed only 16 records: the 用法
+texts with `示例` come mostly from the overlay. So the old and the new rules
+were both run over every section text on the records and the differences
+read by kind (2,246 records at first). What that showed and what was changed
+for it:
+
+- `铸铁管用法兰固定` split at `用法` after the headword: `用法` now needs
+  its formula there (`联合式；`, `作谓语`).
+- `例子；榜样` (the meaning of 傍州例) and `更显著的例子了` became examples:
+  not in front of punctuation or `了`, not after `的`.
+- `宠辱不惊的近义词是置之度外` and `还有一个同义词“假卧”` lost the word:
+  not after `的`, `有`, `个` and the like.
+- `能做到这个程度,真是不简单出处1.` lost `简单` with the heading: the
+  headword goes only when it starts a sentence.
+- On the page of a character, `例句` after a sentence took the next
+  compound's definition along (迷, 诞): not on pages of a single character.
+- `不翼而飞（词语解释：…）` in a list of synonyms became a 释义 of the
+  headword: `解释：` does not end a list.
+- `【释 义】：`, `【出 处】：` (剖心坼肝) were not read at all, a gap from before:
+  spaced-out headings in brackets, and `『…』`, `〔…〕` as brackets.
+
+Against the build above:
+
+| | before | now |
+|---|---:|---:|
+| records with an entity | 8 | 1 |
+| names without a semicolon | 177 | 0 |
+| section texts with a heading word after a sentence | 1,565 | 610 |
+| records with sections | 120,991 | 121,078 |
+| senses showing sections, full | 76,251 | 76,383 |
+| senses showing sections, lexical | 28,971 | 29,033 |
+| shown 示例 | 11,447 | 13,233 |
+| shown 用法 | 4,968 | 5,109 |
+| shown 出处 | 26,448 | 26,572 |
+| shown 反义词 | 2,597 | 2,627 |
+| shown 释义 | 43,951 | 43,955 |
+| headwords, full | 4,799,728 | 4,799,723 |
+| senses, full | 4,877,418 | 4,877,413 |
+| headwords, lexical | 82,060 | 82,060 |
+| zip bytes, full | 1,432,192,152 | 1,432,236,261 |
+| zip bytes, lexical | 36,412,843 | 36,433,587 |
+
+Sections changed on 2,645 records, 1,474 of them under a CC-CEDICT headword.
+Labels gained: 示例 1,602, 用法 263, 出处 146, 反义词 34, 释义 22 (the
+character pages), others 15. Labels lost: 11, each because the text moved to
+another label (获胜: `〔例句〕中国队获胜了。` from 用法 to 示例; 教授:
+`【词性】名词动词` from 释义 to 用法). 132 summaries changed; the entity rules
+are the only change that reaches summaries.
+
+Golden words: 84 of 84 (full) and 57 of 57 (lexical), 12 lines added. Senses
+without a reading 148,224, summaries cut inside a quote 8,159.
+
+**Not fixed**: `示例` glued between two characters in a 释义 or 详解 text
+(`强壮而勇猛；强悍示例粗犷彪悍`), 22 texts, because `欧洲书牍示例` and
+`古文示例` have the same shape; 74 of 7,813 lists of synonyms still run on
+behind a space or a bracket (`唇枪舌剑 【使用程度】常用成语`) — the rule for
+list endings only sees a word glued to the list; senses given under a page's
+own `出处` heading are shown under 出处 (三岛, 规模); the rest of the list in
+the section above. The first two of these, and the tags and private-use
+characters seen in passing, are done in the next section.
+
+## Third local build, 2026-11-12: tags, private-use characters, list tails, glued 示例
+
+**Tags.** A wide pattern (`<word …>`) finds 826 texts with something in
+angle brackets, and most of it is text: `<math>`, `<stdio.h>`, `<believes>`,
+`<A Year Without Rain>`, and pages about HTML elements. Layout tags proper
+(`br`, `p`, `span`, `font`, `strong` …) are in 311 texts, 298 of them
+summaries. Those are taken out of body text. Three guards came from reading
+them: an attribute must be `name=value`; `<a>`, `<b>`, `<i>`, `<u>` only in
+pairs; a text that speaks of `HTML`, `标签`, `元素`, `超文本`, `控件` or
+`字母` keeps its tags. The same pattern still finds 30 texts after the
+build: 13 are about markup, 6 are not tags (`<A Better Day>`, `<li quan>`),
+7 are unpaired or broken (`</B>`, `<p zdct3">`), and 4 are layout tags that
+stay because the text says `元素` or `标签` somewhere else, about something
+else (后孙家鲍村: `耕地1241</SPAN>亩`). The guard looks at the whole text; a
+window around the tag would catch those four.
+
+**Private-use characters.** 472 of them, 179 different code points, in 274
+body texts and 22 titles. Three kinds:
+
+- E815–E864: the 80 characters GB 18030-2000 kept there. The table was
+  checked two ways: Python's `gb18030` codec gives the same character for 66
+  of them (the other 14 it still leaves in the private-use area; those are
+  the ones the 2005 edition moved), and the corpus agrees wherever the
+  context names the character: `口眼㖞斜`, `奕䜣`, `芎䓖`, `康䶮`, `⺮` on the
+  page of 竹, `𠂇` in 左 and 希, `𢦏` in 哉, `龹` in 觠.
+- F020–F0FF: letters of the Symbol and Wingdings fonts. By count they are
+  bullets (F06C 59, F06E 17, F0D8 15, F075 14). A few are signs, and only
+  the text around them tells: F06D is `μ` in `μC/OS-II` and a missing
+  character in `移主□（藏）郎中`, so it is `μ` only in front of a Latin
+  letter or at the end.
+- Everything else belongs to some font nobody has: rare characters in
+  quotations (`其上独有云气，□兮直上`), Japanese in three articles. `□`.
+  E004 and E5E5 occur only between sentences and in front of a text and are
+  dropped.
+
+22 titles had one: 13 lost it from an end, two are the character itself now
+(`𠂇`, `龻`), `相对磁导率μ` and `奕䜣` are mapped, and 5 keep one inside
+(`赵□庆` would be a headword nobody types).
+
+**Lists of synonyms.** 152 lists had a bracket, a colon heading or one of
+the words `相关词`, `感情色彩`, `英文翻译` … somewhere; 8 are left. The
+first version of this rule broke 69 lists and was caught by comparing the
+build with the one before: a source mark right after the heading
+(`近义词[1] 不可名状`) counted as a bracketed heading. That is why the rules
+were then run, old against new, over the raw rows themselves (all 587,819
+overlay rows and 500,000 rows of the 2019 corpus) and not only over the text
+on the records, where the source marks are gone. That comparison found the
+rest:
+
+- A letter-spaced snapshot lost its introduction when a tag or a
+  private-use character was removed before it was put back together
+  (人才培养方案: `简介人才培养…`).
+- `四分五裂常用程度：…用法：作谓语` lost its 用法 part once the list ended
+  at `常用程度`. A heading that names a label counts after the left-out
+  tail too.
+- `确数：确数就是准确的数…`, a synonym with its explanation, was dropped
+  whole. In front of a list nothing ends it.
+
+**示例 in a meaning.** 41 meaning texts of words (not single characters) had
+`示例` or `例句` after a Chinese character; 13 are left, and those are
+`欧洲书牍示例》`, `解释与示例`, `…的例句都有不少` and the like. With a
+colon or in brackets it is a heading after any character; without, the
+headword or `～` has to come after it.
+
+Against the build above:
+
+| | before | now |
+|---|---:|---:|
+| body texts with a private-use character | 274 | 0 |
+| texts with a layout tag | 311 | 30 |
+| lists of synonyms with a tail | 152 | 8 |
+| `示例`/`例句` glued inside a meaning | 41 | 13 |
+| shown 示例 | 13,233 | 13,320 |
+| shown 近义词 | 4,588 | 4,654 |
+| shown 反义词 | 2,627 | 2,673 |
+| shown 辨析 | 1,155 | 1,143 |
+| senses showing sections, full | 76,383 | 76,396 |
+| senses showing sections, lexical | 29,033 | 29,040 |
+| headwords, full | 4,799,723 | 4,799,711 |
+| senses, full | 4,877,413 | 4,877,405 |
+| headwords, lexical | 82,060 | 82,060 |
+| zip bytes, full | 1,432,236,261 | 1,432,224,156 |
+| zip bytes, lexical | 36,433,587 | 36,424,312 |
+
+514 summaries changed (9 under a CC-CEDICT headword) and sections on 467
+records (287). Labels gained: 示例 97, 近义词 85, 反义词 45. Labels lost: 18;
+11 are 辨析 sections that held only lists and show under 近义词 and 反义词
+now, 2 are lists that were no lists (`皲 jūn 字义：形声…`), 5 moved.
+23 headwords went and 11 came: titles that lost a private-use character at
+an end, and records whose whole summary was a tag (`<STRONG id=…>ClockTraySkins`).
+
+Golden words: 95 of 95 (full) and 64 of 64 (lexical), 11 lines added. Senses
+without a reading 148,222, summaries cut inside a quote 8,158.
+
+**Not fixed**: a list that explains each synonym (`内人：屋内之人的意思。…`)
+is shown with the explanations; `□` stands where the character is unknown,
+which is honest and no better to read; the 4 layout tags and 7 broken ones
+named above; the rest of the lists in the two sections above.

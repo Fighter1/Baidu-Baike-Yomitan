@@ -10,7 +10,8 @@ import time
 from typing import Iterator, NamedTuple
 
 from .cleaning import (MIN_SUMMARY_CHARS, clean_text, clean_title, continues_on_next_line, decode_entities,
-                       definition_value, first_paragraph, has_tone_marks, is_summary_candidate, join_lines, pinyin_line_value,
+                       definition_value, first_paragraph, has_tone_marks, is_summary_candidate, join_lines, needs_decoding,
+                       pinyin_line_value,
                        says_nothing, short_summary_keep_reason, summary_drop_reason, title_drop_reason, trim_summary)
 from .readings import stated_pinyins
 from .records import Record, RecordWriter, loads
@@ -199,11 +200,12 @@ def own_sections(sections: list) -> list[tuple[str | None, str | None]]:
 
 def decode_row(raw: dict, stats: collections.Counter | None = None) -> dict:
     """The row with the HTML entities of its title, summary and sections as
-    characters (cleaning.decode_entities). The row itself is left as it is."""
+    characters, and without layout tags and private-use characters
+    (cleaning.decode_entities). The row itself is left as it is."""
     sections = raw.get("sections") or []
     texts = [raw.get("title"), raw.get("summary")]
     texts += [s.get(key) for s in sections for key in ("title", "content")]
-    if not any(isinstance(t, str) and "&" in t for t in texts):
+    if not any(needs_decoding(t) for t in texts):
         return raw
     out = dict(raw, title=decode_entities(raw.get("title")), summary=decode_entities(raw.get("summary"), cut_off=True))
     out["sections"] = [dict(s, title=decode_entities(s.get("title")),

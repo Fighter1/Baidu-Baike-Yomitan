@@ -1,31 +1,31 @@
 # Extract report
 
-Generated 2026-11-11 19:57.
+Generated 2026-11-12 01:26.
 
 ## audit_baike-full
 | metric | value |
 |---|---:|
-| golden_checks | 72 |
-| headwords | 4,799,728 |
-| headwords_whose_first_sense_is_a_work | 268,158 |
-| headwords_with_a_repeated_sense | 125 |
+| golden_checks | 95 |
+| headwords | 4,799,711 |
+| headwords_whose_first_sense_is_a_work | 268,157 |
+| headwords_with_a_repeated_sense | 127 |
 | headwords_with_a_work_above_another_sense | 2,196 |
-| headwords_with_several_senses | 46,902 |
-| of_those_without_a_label | 74,552 |
-| rows | 8,822,039 |
+| headwords_with_several_senses | 46,905 |
+| of_those_without_a_label | 74,559 |
+| rows | 8,822,016 |
 | scope | full |
-| senses | 4,877,418 |
-| senses_of_headwords_with_several | 124,592 |
-| senses_with_sections | 76,251 |
-| senses_without_a_reading | 148,224 |
-| summaries_cut_inside_a_quote | 8,160 |
+| senses | 4,877,405 |
+| senses_of_headwords_with_several | 124,599 |
+| senses_with_sections | 76,396 |
+| senses_without_a_reading | 148,222 |
+| summaries_cut_inside_a_quote | 8,158 |
 | summaries_starting_mid_list | 14,404 |
 | summaries_that_say_nothing | 386 |
 
 ## audit_baike-lexical
 | metric | value |
 |---|---:|
-| golden_checks | 50 |
+| golden_checks | 64 |
 | headwords | 82,060 |
 | headwords_whose_first_sense_is_a_work | 1,880 |
 | headwords_with_a_work_above_another_sense | 62 |
@@ -35,7 +35,7 @@ Generated 2026-11-11 19:57.
 | scope | lexical |
 | senses | 104,657 |
 | senses_of_headwords_with_several | 34,494 |
-| senses_with_sections | 28,971 |
+| senses_with_sections | 29,040 |
 | summaries_cut_inside_a_quote | 134 |
 | summaries_starting_mid_list | 396 |
 | summaries_that_say_nothing | 71 |
@@ -43,33 +43,33 @@ Generated 2026-11-11 19:57.
 ## build_baike-full
 | metric | value |
 |---|---:|
-| entries | 8,822,039 |
-| entries_traditional | 3,944,621 |
-| records_seen | 4,877,418 |
-| seconds | 2,076 |
-| senses_with_sections | 76,251 |
+| entries | 8,822,016 |
+| entries_traditional | 3,944,611 |
+| records_seen | 4,877,405 |
+| seconds | 628 |
+| senses_with_sections | 76,396 |
 | term_banks | 883 |
-| titles_with_multiple_senses | 46,902 |
-| zip_bytes | 1,432,192,152 |
+| titles_with_multiple_senses | 46,905 |
+| zip_bytes | 1,432,224,156 |
 
 ## build_baike-lexical
 | metric | value |
 |---|---:|
 | entries | 167,377 |
 | entries_traditional | 62,720 |
-| records_seen | 4,877,418 |
-| seconds | 90 |
-| senses_with_sections | 28,971 |
+| records_seen | 4,877,405 |
+| seconds | 85 |
+| senses_with_sections | 29,040 |
 | term_banks | 17 |
-| titles_with_multiple_senses | 46,902 |
-| zip_bytes | 36,412,843 |
+| titles_with_multiple_senses | 46,905 |
+| zip_bytes | 36,424,312 |
 
 **Skipped at build**
 
 | reason | count |
 |---|---:|
 | excluded_tag | 2,167 |
-| not_in_cedict | 4,770,594 |
+| not_in_cedict | 4,770,581 |
 
 ## build_ci-smoke
 | metric | value |
@@ -94,22 +94,22 @@ Generated 2026-11-11 19:57.
 | input | data\raw\563w\563w_baidubaike.json |
 | input_rows | 5,634,898 |
 | output | data\records.jsonl |
-| records_with_sections | 90,197 |
-| records_written | 4,674,118 |
-| rows_with_entities_decoded | 42,213 |
-| seconds | 827 |
+| records_with_sections | 90,200 |
+| records_written | 4,674,104 |
+| rows_with_entities_decoded | 48,071 |
+| seconds | 1,453 |
 
 **Drops by reason**
 
 | reason | count |
 |---|---:|
 | dup_lemma_id | 238 |
-| dup_title_summary | 367 |
-| no_summary_no_sections | 208,410 |
+| dup_title_summary | 368 |
+| no_summary_no_sections | 208,414 |
 | summary_not_prose | 73,742 |
 | summary_not_prose_fallback | 50,668 |
-| summary_too_short | 470,875 |
-| summary_too_short_fallback | 140,516 |
+| summary_too_short | 470,879 |
+| summary_too_short_fallback | 140,521 |
 | title_empty | 9 |
 | title_too_long | 15,955 |
 
@@ -120,13 +120,13 @@ Generated 2026-11-11 19:57.
 | infobox_below_top_skipped | 11,008 |
 | kept_alias_line | 556 |
 | kept_short_sentence | 16,281 |
-| pinyin_line_kept | 73,008 |
-| sense_label_from_section | 40,121 |
+| pinyin_line_kept | 73,007 |
+| sense_label_from_section | 40,120 |
 | summary_from_definition_line | 16,861 |
-| summary_from_later_paragraph | 1,371,253 |
-| summary_from_section | 2,708,056 |
+| summary_from_later_paragraph | 1,371,254 |
+| summary_from_section | 2,708,055 |
 | summary_from_section_after_empty_summary | 2,172 |
-| summary_from_section_after_short_summary | 60,949 |
+| summary_from_section_after_short_summary | 60,943 |
 | summary_joined_lines | 919 |
 
 ## extract_hf
@@ -136,9 +136,9 @@ Generated 2026-11-11 19:57.
 | input | data\raw\overlay |
 | input_rows | 587,819 |
 | output | data\records.hf.jsonl |
-| records_with_sections | 44,473 |
+| records_with_sections | 44,608 |
 | records_written | 413,563 |
-| seconds | 1,919 |
+| seconds | 434 |
 
 **Drops by reason**
 
@@ -171,18 +171,18 @@ Generated 2026-11-11 19:57.
 ## merge
 | metric | value |
 |---|---:|
-| added | 203,300 |
+| added | 203,301 |
 | added_extra_sense_of_known_title | 74,648 |
-| added_new_title | 128,652 |
-| kept_primary | 59,430 |
+| added_new_title | 128,653 |
+| kept_primary | 59,429 |
 | key | title |
 | overlay_records | 413,563 |
-| primary_records | 4,674,118 |
-| records_written | 4,877,418 |
-| refreshed | 178,965 |
-| skipped | 90,794 |
-| skipped_primary_title_ambiguous | 66 |
-| skipped_repeated_sense | 2,758 |
+| primary_records | 4,674,104 |
+| records_written | 4,877,405 |
+| refreshed | 178,963 |
+| skipped | 90,798 |
+| skipped_primary_title_ambiguous | 70 |
+| skipped_repeated_sense | 2,759 |
 | skipped_weak_sense_of_known_title | 28,540 |
 
 ## Source inspection: deviations from the task description
@@ -740,9 +740,11 @@ Against the build above (merged records and zips):
 | zip bytes, full | 1,430,709,131 | 1,432,192,152 |
 | zip bytes, lexical | 35,369,154 | 36,412,843 |
 
-The 3,520 that remain are mostly prose (`出处不详`, `解释说`) and headings
-glued between two characters. 辨析 fell because 1,614 such sections held only
-synonym and antonym lists, which now stand under those labels. 250 headwords
+In the samples read, the 3,520 that remain are mostly prose (`出处不详`,
+`解释说`) and headings glued between two characters. 辨析 fell because most
+of the 1,614 sections that lost the label held only synonym and antonym
+lists, which now stand under those labels. Sections changed on 25,350
+records, 14,594 of them under a CC-CEDICT headword. 250 headwords
 went and 142 came, all in the full dictionary but one each way (蒙塾 gone,
 栗腹䴓 new): titles whose entity is now a character (140), and summaries that
 passed or failed the length rule once `&nbsp;` and citation marks were gone.
@@ -760,16 +762,15 @@ Labels lost against the build above, by what happened to the old text:
 
 "Was not text" is `词目：仲秋 拼音：zhòngqiū 基本解释` and the like. The 940
 辨析 are the synonym lists again, reformatted so the old text is not found
-whole. Of the 90 释义 about half were lists of strokes and codes; the real
+whole. Of the 90 释义 many were lists of strokes and codes; the real
 losses are rare characters whose whole meaning is shorter than six characters
 or has no punctuation before the codes (僼, 嚠, 嬚), where the summary says
 it, and pages where the meaning follows a `田字格中的“长”字` caption (长, 浩,
 伍, 娴).
 
 Golden words: 72 of 72 (full) and 50 of 50 (lexical), with 17 lines added
-for these rules. Senses without a reading 148,224 (148,266 before: pinyin
-written with entities is now read), summaries cut inside a quote 8,160
-(8,154).
+for these rules. Senses without a reading 148,224 (148,266 before),
+summaries cut inside a quote 8,160 (8,154).
 
 **Not fixed**: a heading glued between two characters (`多指婚姻示例但～`); a
 meaning that follows `例句：` on later lines goes under 示例 (理智); the
@@ -779,3 +780,204 @@ instead of a kind of word stays in the text (晨钟暮鼓); summaries that open
 with `释义` or `出处` (海角天涯, 一无所获) — the summary rules were not
 touched; and, as before, an example or quotation as the summary where the
 meaning is short (about 1,150 entries have the meaning under 释义 instead).
+The first and the third of these, and the entities left over above, are done
+in the next section.
+
+## Second local build of 2026-11-11: leftover entities, captions, glued headings
+
+**Entities.** The 8 records and 177 bare names left above, looked at one by
+one:
+
+- `MM(MCJH&amp;amp;amp;TWJ)` was an `&` escaped seven times; the decoder
+  stopped after four passes. It now runs until nothing changes.
+- 135 bare `&amp` and 3 `&quot`: read in context, nearly all are what the
+  corpus left of an entity it cut off, usually one escaped twice at the end
+  of a picture caption that then runs into the summary (`Can&amp` of
+  `Can&amp;#39;t`, `Ch&amp奥松酒庄` of `Ch&amp;acirc;teau`, `汤米&amp汤米是一位…`).
+  Turning them into `&` would leave a stray `&`, so they are removed; only
+  between two Latin words is it an `&` (`Honey &amp Clover`).
+- 29 `&nbsp` in front of a digit (`占地&nbsp11公顷`) are spaces now.
+- 10 with a full-width semicolon (`&lt；br&gt；`, `五笔86&amp；98`).
+- `&bsp;`, `&agmp;`, `&subm;`/`&subs;`/`&sub1;`, `&S226;` (two articles, both
+  where a middle dot belongs), `&O1548;`: a small table. The last two are a
+  guess.
+
+Applied to the records of the build above, 160 change. After the rebuild one
+record has an entity-shaped piece left (`上海&ALICE;&蓬莱`, text) and no bare
+name is left. Six 2019 records are gone, five of them headwords: their whole
+summary was such a caption stump (`海贼波琪&amp英文名：Porche`); the sixth,
+`don't panic`, still has its overlay sense.
+
+Seen while looking, not touched: 315 records have literal tags in the text
+(`<br>` 157, `<p>` 131; pages about HTML among them), and 296 have characters
+from the private-use area, which show as boxes.
+
+**Captions.** `田字格` was on the list of things that make a section "not a
+sense", so 长, 浩, 伍, 娴 lost their 释义. The caption is now taken out
+instead. The first rebuild still showed `田字格长汉语拼音：cháng`: the raw text
+is `田字格 长`, with a space, and other pages say `田字格里的‘烦’`,
+`田字格中的简体字‘过’`, `田字格之宋体字`. After the second rebuild one is left
+(`熟，田字格四角号码:`). `书法“浩”字` is only taken out on the page of a single
+character: `岳飞草书“还我河山”巨匾` is a sentence.
+
+**Glued headings.** Counted on the records of the build above, by the label
+of the section, the heading word inside it and what stands in front of it:
+`示例` inside a 用法 text 1,761 times (908 after a sentence, 841 glued to a
+character), far ahead of everything else; `出处` after a sentence in a 释义
+or 详解 text about 100; `反义词` glued inside a list of synonyms 35. `解释`
+inside 释义 (1,287) is prose almost every time and is left alone.
+
+The 500,000-row trial on the 2019 corpus changed only 16 records: the 用法
+texts with `示例` come mostly from the overlay. So the old and the new rules
+were both run over every section text on the records and the differences
+read by kind (2,246 records at first). What that showed and what was changed
+for it:
+
+- `铸铁管用法兰固定` split at `用法` after the headword: `用法` now needs
+  its formula there (`联合式；`, `作谓语`).
+- `例子；榜样` (the meaning of 傍州例) and `更显著的例子了` became examples:
+  not in front of punctuation or `了`, not after `的`.
+- `宠辱不惊的近义词是置之度外` and `还有一个同义词“假卧”` lost the word:
+  not after `的`, `有`, `个` and the like.
+- `能做到这个程度,真是不简单出处1.` lost `简单` with the heading: the
+  headword goes only when it starts a sentence.
+- On the page of a character, `例句` after a sentence took the next
+  compound's definition along (迷, 诞): not on pages of a single character.
+- `不翼而飞（词语解释：…）` in a list of synonyms became a 释义 of the
+  headword: `解释：` does not end a list.
+- `【释 义】：`, `【出 处】：` (剖心坼肝) were not read at all, a gap from before:
+  spaced-out headings in brackets, and `『…』`, `〔…〕` as brackets.
+
+Against the build above:
+
+| | before | now |
+|---|---:|---:|
+| records with an entity | 8 | 1 |
+| names without a semicolon | 177 | 0 |
+| section texts with a heading word after a sentence | 1,565 | 610 |
+| records with sections | 120,991 | 121,078 |
+| senses showing sections, full | 76,251 | 76,383 |
+| senses showing sections, lexical | 28,971 | 29,033 |
+| shown 示例 | 11,447 | 13,233 |
+| shown 用法 | 4,968 | 5,109 |
+| shown 出处 | 26,448 | 26,572 |
+| shown 反义词 | 2,597 | 2,627 |
+| shown 释义 | 43,951 | 43,955 |
+| headwords, full | 4,799,728 | 4,799,723 |
+| senses, full | 4,877,418 | 4,877,413 |
+| headwords, lexical | 82,060 | 82,060 |
+| zip bytes, full | 1,432,192,152 | 1,432,236,261 |
+| zip bytes, lexical | 36,412,843 | 36,433,587 |
+
+Sections changed on 2,645 records, 1,474 of them under a CC-CEDICT headword.
+Labels gained: 示例 1,602, 用法 263, 出处 146, 反义词 34, 释义 22 (the
+character pages), others 15. Labels lost: 11, each because the text moved to
+another label (获胜: `〔例句〕中国队获胜了。` from 用法 to 示例; 教授:
+`【词性】名词动词` from 释义 to 用法). 132 summaries changed; the entity rules
+are the only change that reaches summaries.
+
+Golden words: 84 of 84 (full) and 57 of 57 (lexical), 12 lines added. Senses
+without a reading 148,224, summaries cut inside a quote 8,159.
+
+**Not fixed**: `示例` glued between two characters in a 释义 or 详解 text
+(`强壮而勇猛；强悍示例粗犷彪悍`), 22 texts, because `欧洲书牍示例` and
+`古文示例` have the same shape; 74 of 7,813 lists of synonyms still run on
+behind a space or a bracket (`唇枪舌剑 【使用程度】常用成语`) — the rule for
+list endings only sees a word glued to the list; senses given under a page's
+own `出处` heading are shown under 出处 (三岛, 规模); the rest of the list in
+the section above. The first two of these, and the tags and private-use
+characters seen in passing, are done in the next section.
+
+## Third local build, 2026-11-12: tags, private-use characters, list tails, glued 示例
+
+**Tags.** A wide pattern (`<word …>`) finds 826 texts with something in
+angle brackets, and most of it is text: `<math>`, `<stdio.h>`, `<believes>`,
+`<A Year Without Rain>`, and pages about HTML elements. Layout tags proper
+(`br`, `p`, `span`, `font`, `strong` …) are in 311 texts, 298 of them
+summaries. Those are taken out of body text. Three guards came from reading
+them: an attribute must be `name=value`; `<a>`, `<b>`, `<i>`, `<u>` only in
+pairs; a text that speaks of `HTML`, `标签`, `元素`, `超文本`, `控件` or
+`字母` keeps its tags (the 30 that are left).
+
+**Private-use characters.** 472 of them, 179 different code points, in 274
+body texts and 22 titles. Three kinds:
+
+- E815–E864: the 80 characters GB 18030-2000 kept there. The table was
+  checked two ways: Python's `gb18030` codec gives the same character for 66
+  of them (the other 14 it still leaves in the private-use area; those are
+  the ones the 2005 edition moved), and the corpus agrees wherever the
+  context names the character: `口眼㖞斜`, `奕䜣`, `芎䓖`, `康䶮`, `⺮` on the
+  page of 竹, `𠂇` in 左 and 希, `𢦏` in 哉, `龹` in 觠.
+- F020–F0FF: letters of the Symbol and Wingdings fonts. By count they are
+  bullets (F06C 59, F06E 17, F0D8 15, F075 14). A few are signs, and only
+  the text around them tells: F06D is `μ` in `μC/OS-II` and a missing
+  character in `移主□（藏）郎中`, so it is `μ` only in front of a Latin
+  letter or at the end.
+- Everything else belongs to some font nobody has: rare characters in
+  quotations (`其上独有云气，□兮直上`), Japanese in three articles. `□`.
+  E004 and E5E5 occur only between sentences and in front of a text and are
+  dropped.
+
+22 titles had one: 13 lost it from an end, two are the character itself now
+(`𠂇`, `龻`), `相对磁导率μ` and `奕䜣` are mapped, and 5 keep one inside
+(`赵□庆` would be a headword nobody types).
+
+**Lists of synonyms.** 152 lists had a bracket, a colon heading or one of
+the words `相关词`, `感情色彩`, `英文翻译` … somewhere; 8 are left. The
+first version of this rule broke 69 lists and was caught by comparing the
+build with the one before: a source mark right after the heading
+(`近义词[1] 不可名状`) counted as a bracketed heading. That is why the rules
+were then run, old against new, over the raw rows themselves (all 587,819
+overlay rows and 500,000 rows of the 2019 corpus) and not only over the text
+on the records, where the source marks are gone. That comparison found the
+rest:
+
+- A letter-spaced snapshot lost its introduction when a tag or a
+  private-use character was removed before it was put back together
+  (人才培养方案: `简介人才培养…`).
+- `四分五裂常用程度：…用法：作谓语` lost its 用法 part once the list ended
+  at `常用程度`. A heading that names a label counts after the left-out
+  tail too.
+- `确数：确数就是准确的数…`, a synonym with its explanation, was dropped
+  whole. In front of a list nothing ends it.
+
+**示例 in a meaning.** 41 meaning texts of words (not single characters) had
+`示例` or `例句` after a Chinese character; 13 are left, and those are
+`欧洲书牍示例》`, `解释与示例`, `…的例句都有不少` and the like. With a
+colon or in brackets it is a heading after any character; without, the
+headword or `～` has to come after it.
+
+Against the build above:
+
+| | before | now |
+|---|---:|---:|
+| body texts with a private-use character | 274 | 0 |
+| texts with a layout tag | 311 | 30 |
+| lists of synonyms with a tail | 152 | 8 |
+| `示例`/`例句` glued inside a meaning | 41 | 13 |
+| shown 示例 | 13,233 | 13,320 |
+| shown 近义词 | 4,588 | 4,654 |
+| shown 反义词 | 2,627 | 2,673 |
+| shown 辨析 | 1,155 | 1,143 |
+| senses showing sections, full | 76,383 | 76,396 |
+| senses showing sections, lexical | 29,033 | 29,040 |
+| headwords, full | 4,799,723 | 4,799,711 |
+| senses, full | 4,877,413 | 4,877,405 |
+| headwords, lexical | 82,060 | 82,060 |
+| zip bytes, full | 1,432,236,261 | 1,432,224,156 |
+| zip bytes, lexical | 36,433,587 | 36,424,312 |
+
+514 summaries changed (9 under a CC-CEDICT headword) and sections on 467
+records (287). Labels gained: 示例 97, 近义词 85, 反义词 45. Labels lost: 18;
+11 are 辨析 sections that held only lists and show under 近义词 and 反义词
+now, 2 are lists that were no lists (`皲 jūn 字义：形声…`), 5 moved.
+23 headwords went and 11 came: titles that lost a private-use character at
+an end, and records whose whole summary was a tag (`<STRONG id=…>ClockTraySkins`).
+
+Golden words: 95 of 95 (full) and 64 of 64 (lexical), 11 lines added. Senses
+without a reading 148,222, summaries cut inside a quote 8,158.
+
+**Not fixed**: a list that explains each synonym (`内人：屋内之人的意思。…`)
+is shown with the explanations; `□` stands where the character is unknown,
+which is honest and no better to read; tags on pages about markup that are
+layout after all; the rest of the lists in the two sections above.

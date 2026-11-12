@@ -118,3 +118,41 @@
 臆	section_lacks	五笔
 娱	section_has	娱，乐也
 娱	section_lacks	笔划
+
+# -- Entities without a semicolon, escaped seven times or damaged (芾 had 五笔86&agmp;98, 机械品质因数 用Q&subm;表示)
+芾	table_lacks	agmp
+木村井泓	summary_lacks	amp;	full
+机械品质因数	any	用Qm表示	full
+
+# -- The caption of a picture of the character is taken out, not the section with it (长 and 浩 had lost their 释义)
+长	section_has	两端的距离
+长	section_lacks	田字格
+浩	section_has	水大，引申为大和多
+浩	section_lacks	书法“浩”
+伍	section_has	五人为伍
+
+# -- A heading with nothing to mark it (曲高和寡 had 阳春白雪反义词下里巴人成语出处战国… as its synonyms,
+#    赔了夫人又折兵 opened its 用法 with 赔了夫人又折兵成文用法, 剖心坼肝 had 【出 处】 and 【用 法】 inside its 释义)
+曲高和寡	section_lacks	成语出处
+赔了夫人又折兵	section_lacks	成文用法	full
+剖心坼肝	section_lacks	【出处】	full
+剖心坼肝	section_has	作谓语、定语；用于书面语	full
+
+# -- Layout tags and private-use characters of the raw text (哉 and 阳白穴 had a private-use character for 𢦏 and 㖞,
+#    云南吉顺号茶业有限公司 a <br> in its summary; 其上独有云气，□兮直上 has a character that cannot be shown)
+哉	any	字从“𢦏”
+阳白穴	any	口眼㖞斜	full
+荐枕	section_has	□兮直上	full
+相对磁导率μ	present		full
+云南吉顺号茶业有限公司	summary_lacks	<br>	full
+
+# -- A list of synonyms ends at a heading that is none of its own (促膝谈心 had 唇枪舌剑 【使用程度】常用成语 …);
+#    a source mark is not one (a build lost 不可名状 behind 近义词[1])
+促膝谈心	section_lacks	使用程度
+冥顽不灵	section_lacks	相反词
+打盹	section_lacks	doze
+莫可名状	section_has	不可名状
+
+# -- 示例 and 例句 glued to the last character of a meaning (对头 had 正确，合适例句：方法对头 in its 详解)
+对头	section_lacks	合适例句：
+对头	section_has	方法对头，效率就高
