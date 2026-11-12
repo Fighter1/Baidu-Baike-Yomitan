@@ -86,15 +86,54 @@ _TAG_RE = re.compile(rf"</?(?:br|wbr|p|div|li|span|strong|em|font|sup|sub|iframe
                      rf"|<a\s+[A-Za-z-]+\s*=[^<>]*>", re.I)
 # <a>, <b>, <i>, <u> only as a pair: 字母<u> is a letter
 _PAIRED_TAG_RE = re.compile(r"<([abiu])>(.*?)</\1>", re.I | re.S)
-# A page about markup means its tags: li 标签定义列表项目。以<li>开始</li>结束
-_ABOUT_MARKUP_RE = re.compile(r"html|标签|标识符|元素|字母|超文本|超链接|控件|<(?:body|head|ul|ol|table|script)\b", re.I)
+_CLOSING_A_RE = re.compile(r"</[aA]>")
+_LINE_TAG_RE = re.compile(r"<(?:br|wbr|p)\b", re.I)
+# A text about markup means its tags: li 标签定义列表项目。以<li>开始</li>结束. These say that it is one,
+# wherever they stand outside a layout tag (a map pasted as <iframe src="…/mapElem.html"> says nothing).
+_ABOUT_MARKUP_RE = re.compile(r"html|标识符|超文本|超链接|控件|<(?:body|head|ul|ol|table|script)\b", re.I)
+# 标签 is also a label on a tin, so it has to stand near a tag: 继发性肾病 has 血管病</a>变 and, 1,900
+# characters on, 食物成分标签.
+LABEL_NEAR = 100
+# 元素 and 字母 are said of other things far more often (多种矿物元素, 26个拉丁字母), so they have to name a tag:
+# <p> 元素, iframe元素, <book> 元素, 页面元素<div>. Not 微量元素<br>, where a line ends. The three characters
+# stand for an opening layout tag, a closing one and one that breaks a line.
+_OPENING, _CLOSING, _BREAK = chr(2), chr(3), chr(4)
+_NAMES_A_TAG_RE = re.compile(rf"(?:[A-Za-z>]\s?|[{_OPENING}{_BREAK}]\s*)(?:元素|字母)"
+                             rf"|(?:元素|字母)[\s：:（(]{{0,3}}{_OPENING}")
+
+
+def _tag_spans(text: str) -> list[tuple[int, int]]:
+    """Where the layout tags of a text are."""
+    spans = {m.span() for m in _TAG_RE.finditer(text)} | {m.span() for m in _CLOSING_A_RE.finditer(text)}
+    for m in _PAIRED_TAG_RE.finditer(text):
+        spans |= {(m.start(), m.start() + 3), (m.end() - 4, m.end())}
+    return sorted(spans)
+
+
+def _speaks_of_tags(text: str, spans: list[tuple[int, int]]) -> bool:
+    """Whether a text with layout tags at these places is about markup."""
+    marked = list(text)
+    for start, end in spans:
+        kind = _CLOSING if text[start + 1] == "/" else _BREAK if _LINE_TAG_RE.match(text, start) else _OPENING
+        marked[start:end] = kind * (end - start)
+    marked = "".join(marked)
+    if _ABOUT_MARKUP_RE.search(marked) or _NAMES_A_TAG_RE.search(marked):
+        return True
+    at = marked.find("标签")
+    while at >= 0:
+        if any(at - end <= LABEL_NEAR and start - at - 2 <= LABEL_NEAR for start, end in spans):
+            return True
+        at = marked.find("标签", at + 2)
+    return False
 
 
 def strip_tags(text: str) -> str:
     """Body text without the layout tags that the corpus kept as text. A tag
     that broke a line leaves a space."""
-    bare = _PAIRED_TAG_RE.sub(r"\2", _TAG_RE.sub(" ", text)).replace("</a>", "").replace("</A>", "")
-    return text if bare == text or _ABOUT_MARKUP_RE.search(bare) else bare
+    spans = _tag_spans(text)
+    if not spans or _speaks_of_tags(text, spans):
+        return text
+    return _PAIRED_TAG_RE.sub(r"\2", _TAG_RE.sub(" ", text)).replace("</a>", "").replace("</A>", "")
 
 
 # Characters of the private-use area mean something only in the font or the encoding they were typed in.

@@ -1,6 +1,6 @@
 # Extract report
 
-Generated 2026-11-12 01:26.
+Generated 2026-11-12 05:54.
 
 ## audit_baike-full
 | metric | value |
@@ -46,11 +46,11 @@ Generated 2026-11-12 01:26.
 | entries | 8,822,016 |
 | entries_traditional | 3,944,611 |
 | records_seen | 4,877,405 |
-| seconds | 628 |
+| seconds | 897 |
 | senses_with_sections | 76,396 |
 | term_banks | 883 |
 | titles_with_multiple_senses | 46,905 |
-| zip_bytes | 1,432,224,156 |
+| zip_bytes | 1,432,224,070 |
 
 ## build_baike-lexical
 | metric | value |
@@ -58,7 +58,7 @@ Generated 2026-11-12 01:26.
 | entries | 167,377 |
 | entries_traditional | 62,720 |
 | records_seen | 4,877,405 |
-| seconds | 85 |
+| seconds | 122 |
 | senses_with_sections | 29,040 |
 | term_banks | 17 |
 | titles_with_multiple_senses | 46,905 |
@@ -96,8 +96,8 @@ Generated 2026-11-12 01:26.
 | output | data\records.jsonl |
 | records_with_sections | 90,200 |
 | records_written | 4,674,104 |
-| rows_with_entities_decoded | 48,071 |
-| seconds | 1,453 |
+| rows_with_entities_decoded | 48,144 |
+| seconds | 1,350 |
 
 **Drops by reason**
 
@@ -138,7 +138,7 @@ Generated 2026-11-12 01:26.
 | output | data\records.hf.jsonl |
 | records_with_sections | 44,608 |
 | records_written | 413,563 |
-| seconds | 434 |
+| seconds | 703 |
 
 **Drops by reason**
 
@@ -897,7 +897,12 @@ angle brackets, and most of it is text: `<math>`, `<stdio.h>`, `<believes>`,
 summaries. Those are taken out of body text. Three guards came from reading
 them: an attribute must be `name=value`; `<a>`, `<b>`, `<i>`, `<u>` only in
 pairs; a text that speaks of `HTML`, `标签`, `元素`, `超文本`, `控件` or
-`字母` keeps its tags (the 30 that are left).
+`字母` keeps its tags. The same pattern still finds 30 texts after the
+build: 13 are about markup, 6 are not tags (`<A Better Day>`, `<li quan>`),
+7 are unpaired or broken (`</B>`, `<p zdct3">`), and 4 are layout tags that
+stay because the text says `元素` or `标签` somewhere else, about something
+else (后孙家鲍村: `耕地1241</SPAN>亩`). The guard looks at the whole text; a
+window around the tag would catch those four.
 
 **Private-use characters.** 472 of them, 179 different code points, in 274
 body texts and 22 titles. Three kinds:
@@ -979,5 +984,5 @@ without a reading 148,222, summaries cut inside a quote 8,158.
 
 **Not fixed**: a list that explains each synonym (`内人：屋内之人的意思。…`)
 is shown with the explanations; `□` stands where the character is unknown,
-which is honest and no better to read; tags on pages about markup that are
-layout after all; the rest of the lists in the two sections above.
+which is honest and no better to read; the 4 layout tags and 7 broken ones
+named above; the rest of the lists in the two sections above.

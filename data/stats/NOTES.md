@@ -715,7 +715,8 @@ build: 13 are about markup, 6 are not tags (`<A Better Day>`, `<li quan>`),
 7 are unpaired or broken (`</B>`, `<p zdct3">`), and 4 are layout tags that
 stay because the text says `元素` or `标签` somewhere else, about something
 else (后孙家鲍村: `耕地1241</SPAN>亩`). The guard looks at the whole text; a
-window around the tag would catch those four.
+window around the tag would catch those four. (That split was wrong: seven
+texts kept a layout tag for this reason, not four. See the next section.)
 
 **Private-use characters.** 472 of them, 179 different code points, in 274
 body texts and 22 titles. Three kinds:
@@ -799,3 +800,63 @@ without a reading 148,222, summaries cut inside a quote 8,158.
 is shown with the explanations; `□` stands where the character is unknown,
 which is honest and no better to read; the 4 layout tags and 7 broken ones
 named above; the rest of the lists in the two sections above.
+
+## Fourth local build, 2026-11-12: which texts are about markup
+
+The note above said four layout tags stayed because of a word used about
+something else. Counted again on the records of that build, with the
+pattern the code itself uses, 18 body texts still had a layout tag: 10 about
+markup, one that is pasted advertising code (环法车赛, kept because of its
+`<SCRIPT>`), and seven that should have lost theirs:
+
+| entry | tag | what kept it |
+|---|---|---|
+| 后孙家鲍村 | `耕地1241</SPAN>亩` | `多种矿物元素` |
+| 抹茶故事 | `<p>抹茶故事MATCHA…</p>` | `时尚元素` |
+| 古董玉器装饰：玉意奢华 | `<p> 《古董玉器装饰…` | `异域文化的元素` |
+| 闪耀☆南国小麦色 | `<p>暑假的旅行！` | `元素`, 230 characters on in the raw text |
+| 继发性肾病 | `血管病</a>变` | `食物成分标签`, 1,900 characters on |
+| 拉尔夫·阿尔菲 | `（<noinclude>）` | `大爆炸元素合成`, `希腊字母` |
+| 普实台文 | `（<noinclude>，简称PSDB）` | `拉丁字母` |
+
+Two of them show no such word in the text on the record. The guard reads
+the whole raw text, and the word stands past the place where the summary is
+cut.
+
+In the raw 2019 text the guard kept the tags of 515 texts out of 3,073 that
+have one. Measured from the nearest tag to the nearest guard word, `html`,
+`超链接`, `控件` and `标签` are about markup almost wherever they stand
+(`ed2k`, `preg_match_all`, `Core标签库` at 60 to 100 characters), `标签` far
+away is a label (`食物成分标签`, `标签文件`), and `元素` and `字母` are wrong
+at any distance: `宗教</a>元素` at 0, `<a href="#">第一主族元素` at 4,
+`合金元素…<sup>[14]</sup>` at 25. A window alone does not separate them. The
+rule now:
+
+- `HTML`, `超文本`, `超链接`, `控件`, `标识符` or a tag of another kind
+  (`<body>`, `<ul>`, `<table>`, `<script>`) anywhere, as before, but outside
+  the layout tags themselves: a map pasted as
+  `<iframe src="…/mapElem.html">` no longer counts.
+- `标签` within 100 characters of a tag.
+- `元素` and `字母` only where they name a tag: after a Latin name or a tag
+  (`iframe元素`, `<p> 元素`, `<book> 元素`), or right in front of an opening
+  tag that does not break a line (`页面元素<div>`, not `微量元素<br>`).
+
+Old against new, the way the last section learned to check: every raw 2019
+row with a layout tag converted with both trees (2,644 rows) gives seven
+records that differ, the seven above, each in its summary only; all 587,819
+overlay rows give none. On the raw texts 93 of the 515 lose their tags.
+Most are prose (`木鱼石`, `炒金`, `碳水化合物`). Some are code samples whose
+only guard word was `元素` for an array or DOM element (`POS()`,
+`CSS伪元素`, `锚点`); none of those texts is on a record.
+
+The build: 11 body texts with a layout tag (the 10 about markup and
+环法车赛). Headwords, senses, rows and sections as in the build above; the
+full zip is 1,432,224,070 bytes, the lexical one unchanged. Golden words 99
+of 99 (full) and 64 of 64 (lexical), 4 lines added.
+
+**Not fixed**: where a `<noinclude>` stood for a name the corpus lost, an
+empty bracket is left (`阿尔菲（）`, `普实台文（，简称PSDB）`); a text that
+says `HTML` about something else keeps its tags (广州市诚毅科技软件开发有限公司
+in a section that is not shown), and so do `H13钢` and five pages with the
+same text (`合金元素…<sup>[14]</sup>`, not shown either; why was not looked
+into); the 7 unpaired or broken tags.

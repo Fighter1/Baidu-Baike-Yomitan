@@ -233,6 +233,19 @@ def test_layout_tags_in_body_text():
                  "意思是超文本引用。1.内部连接：<a href=\"#/URL\">name</a>"):
         assert body(text) == text
     assert decode_entities("<p>标题</p>") == "<p>标题</p>"         # a title is left alone
+    # a word that is said of other things does not make a text one about markup: 标签 far from the tag, 元素 and
+    # 字母 that name no tag, html inside a pasted tag
+    far = "轻者晨起后见眼睑浮肿，重者水肿延及全身。" * 6
+    assert body("此外血管病</a>变如高血压。" + far + "仔细阅读食物成分标签。") == "此外血管病变如高血压。" + far + "仔细阅读食物成分标签。"
+    assert body("耕地1241</SPAN>亩。所产矿泉水富含人体必须的多种矿物元素。") == "耕地1241 亩。所产矿泉水富含人体必须的多种矿物元素。"
+    assert body("<p>抹茶故事MATCHA 男装强调时尚元素，令穿着者相信。</p>") == " 抹茶故事MATCHA 男装强调时尚元素，令穿着者相信。 "
+    assert body("台语现代文（<noinclude>，简称MLT），用26个拉丁字母即可拼出") == "台语现代文（ ，简称MLT），用26个拉丁字母即可拼出"
+    assert body("<a target=_blank href=/view/9438.htm>宗教</a>元素。富含微量元素<br>口感清甜") == " 宗教元素。富含微量元素 口感清甜"
+    assert body("楼盘信息<iframe src=\"/editor/map/mapElem.html?from=lemmaview\"></iframe>交通便利") == "楼盘信息  交通便利"
+    for text in ("查找文档中所有的 <p> 元素，不管 <p> 元素处于哪个层次", "不支持iframe元素。可以把文本放置在<iframe>和</iframe>之间",
+                 "创建页面元素<div id=\"ID值\"></div>", "返回 category 属性是否是 <book> 元素的 ID 属性：document.write(\"<br />\")",
+                 "将PHP控件化，既可以实现各种表格列表又可以实现<Li></Li>形式的列表", "食品标签上的换行写作<br>"):
+        assert body(text) == text
 
 
 def test_characters_of_the_private_use_area():

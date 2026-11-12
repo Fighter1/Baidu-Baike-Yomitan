@@ -346,8 +346,13 @@ are taken out; a tag that broke a line leaves a space.
   `<a>`, `<b>`, `<i>` and `<u>` only as a pair, because `字母<u>` is a letter.
 - An attribute has to be `name=value`: `<A Year Without Rain>` is an album and
   `<li quan>` a reading. `<stdio.h>`, `<math>` and the like are text.
-- A text about markup keeps its tags (`以<li>开始</li>结束`): one that says
-  `HTML`, `标签`, `元素`, `超文本`, `控件` or `字母` is left alone.
+- A text about markup keeps its tags (`以<li>开始</li>结束`). It is one when
+  it says `HTML`, `超文本`, `超链接`, `控件` or `标识符`, or has tags of
+  another kind (`<body>`, `<ul>`, `<table>`, `<script>`); when `标签` stands
+  within 100 characters of a tag; or when `元素` or `字母` names a tag
+  (`<p> 元素`, `iframe元素`, `页面元素<div>`). `多种矿物元素` in a text about a
+  village does not make it one, nor does a food label 1,900 characters after
+  a stray `</a>`.
 - Titles are left alone.
 
 **Private-use characters.** A character from U+E000 to U+F8FF means something
@@ -374,9 +379,9 @@ character.
 
 311 texts had a layout tag, and 274 body texts and 22 titles a private-use
 character. No body text has one now; five titles keep one inside them. Of
-the layout tags, 11 are left outside texts about markup: 7 unpaired or
-broken ones (`</B>`, `<p zdct3">`) and 4 in texts that say `元素` or `标签`
-about something else.
+the layout tags, 11 body texts keep theirs: 10 are about markup and one is
+pasted advertising code. Another 7 unpaired or broken ones (`</B>`,
+`<p zdct3">`) are not read as tags and stay.
 
 ### Sections of pages about words
 

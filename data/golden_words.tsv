@@ -156,3 +156,10 @@
 # -- 示例 and 例句 glued to the last character of a meaning (对头 had 正确，合适例句：方法对头 in its 详解)
 对头	section_lacks	合适例句：
 对头	section_has	方法对头，效率就高
+
+# -- A layout tag stays only where the text speaks of tags (后孙家鲍村 kept 耕地1241</SPAN>亩 because its spring
+#    water has 矿物元素, 继发性肾病 a </a> because of a food label 1,900 characters further on)
+后孙家鲍村	summary_lacks	</SPAN>	full
+后孙家鲍村	any	耕地1241 亩	full
+继发性肾病	summary_lacks	</a>	full
+li标签	any	以<li>开始</li>结束	full
