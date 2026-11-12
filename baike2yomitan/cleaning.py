@@ -1,6 +1,8 @@
 """Shared text cleaning and quality rules (source-agnostic)."""
 from __future__ import annotations
 
+import html
+import html.entities
 import re
 
 MIN_SUMMARY_CHARS = 15
@@ -14,6 +16,7 @@ _CITATION_RE = re.compile(r"[\[［]\s*\d{1,3}(?:\s*[-–]\s*\d{1,3})?\s*[\]］]"
 _UI_COMPOUND_RE = re.compile(r"编辑播报|播报编辑|编辑语音|语音编辑|播报语音")
 _UI_EDGE_RE = re.compile(r"^(?:(?:播报|编辑|语音)(?:\s+|$))+|(?:(?:^|\s+)(?:播报|编辑|语音))+$")
 _TRAILER_RE = re.compile(r"\s*zhua曲子白渡白颗\s*$")
+_WATERMARK_RE = re.compile(r"咟喥咟萪")      # 百度百科 in look-alike characters, anywhere in a text
 # Gallery captions that leak into scraped text: "剧照(80张)", "合并图册(2张)".
 # The marker is certain; where the caption before it starts is not.
 _CAPTION_MARK_RE = re.compile(r"[（(]\d{1,3}张[)）]")
@@ -45,6 +48,54 @@ _STUB_WORDS = ("成语发音", "成语读音", "汉语拼音", "基本信息", "
                "词目", "词语", "词汇", "成语", "名称", "中文名", "汉语", "汉字", "简体", "繁体")
 
 
+# HTML entities that the corpus kept as text: Universit&auml;t, 41-60m&sup2;, d&igrave;ngzhǐ.
+_ENTITY_RE = re.compile(r"&(?:#\d{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,12});")
+_BARE_NBSP_RE = re.compile(r"&nbsp(?![;A-Za-z0-9])", re.I)
+# An entity that the corpus cut off with the end of a text: 也说“走背字儿&rdqu. Not you&me, m&ms.
+_CUT_ENTITY_RE = re.compile(r"(?<![A-Za-z0-9])&([a-z]{3,8})$")
+_ENTITY_NAMES = tuple(name for name in html.entities.html5 if name.endswith(";"))
+# Names that no browser knows, from a transliteration scheme for Sanskrit and Pali.
+_EXTRA_ENTITIES = {
+    "amacron": "ā", "emacron": "ē", "imacron": "ī", "omacron": "ō", "umacron": "ū",
+    "Amacron": "Ā", "Emacron": "Ē", "Imacron": "Ī", "Omacron": "Ō", "Umacron": "Ū",
+    "ddotblw": "ḍ", "hdotblw": "ḥ", "ldotblw": "ḷ", "mdotblw": "ṃ", "ndotblw": "ṇ", "rdotblw": "ṛ",
+    "sdotblw": "ṣ", "tdotblw": "ṭ", "mdotabv": "ṁ", "ndotabv": "ṅ",
+}
+
+
+def _entity(m: re.Match) -> str:
+    whole = m.group(0)
+    char = html.unescape(whole)
+    if char != whole:
+        return char
+    name = whole[1:-1]
+    if name in _EXTRA_ENTITIES:
+        return _EXTRA_ENTITIES[name]
+    lower = "&" + name.lower() + ";"        # &NBSP;, &DEG;
+    char = html.unescape(lower)
+    return char if char != lower else whole
+
+
+def decode_entities(text: str | None, cut_off: bool = False) -> str | None:
+    """HTML entities as the characters they stand for, for raw text before any
+    other rule sees it: &#91;2&#93; has to be [2] for the citation rule, and
+    d&igrave;ngzhǐ has to be dìngzhǐ to be read as pinyin. More than once,
+    because some are escaped two or three times (&amp;amp;nbsp;). A name nobody
+    knows stays as it is. `cut_off`: the text is body text that the corpus may
+    have ended inside an entity; a title can end in &me."""
+    if not text or "&" not in text:
+        return text
+    for _ in range(4):
+        decoded = _ENTITY_RE.sub(_entity, text)
+        if decoded == text:
+            break
+        text = decoded
+    cut = _CUT_ENTITY_RE.search(text) if cut_off else None
+    if cut and any(name.startswith(cut.group(1)) for name in _ENTITY_NAMES):
+        text = text[:cut.start()]
+    return _BARE_NBSP_RE.sub(" ", text).replace("\u00ad", "")      # the soft hyphen shows nothing
+
+
 def strip_citations(text: str) -> str:
     return _CITATION_RE.sub("", text)
 
@@ -52,7 +103,7 @@ def strip_citations(text: str) -> str:
 def strip_ui_labels(text: str, title: str | None = None) -> str:
     """Remove leaked interface labels. A compound that is part of the article's
     own title is prose, not a label: 语音编辑器是一种… must not lose 语音编辑."""
-    text = _TRAILER_RE.sub("", text)
+    text = _WATERMARK_RE.sub("", _TRAILER_RE.sub("", text))
     text = _UI_COMPOUND_RE.sub(lambda m: m.group(0) if title and m.group(0) in title else "", text)
     return _UI_EDGE_RE.sub("", text)
 

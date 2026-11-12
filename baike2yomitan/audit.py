@@ -26,8 +26,9 @@ from .validate import worker_count
 
 GOLDEN_PATH = os.path.join("data", "golden_words.tsv")
 CHECKS = ("present", "absent", "reading", "first_reading", "first", "first_not_work", "any", "ends", "traditional",
-          "senses_max", "table_lacks")
-NEEDS_VALUE = {"reading", "first_reading", "first", "any", "ends", "traditional", "senses_max", "table_lacks"}
+          "senses_max", "table_lacks", "section_has", "section_lacks", "summary_lacks")
+NEEDS_VALUE = {"reading", "first_reading", "first", "any", "ends", "traditional", "senses_max", "table_lacks",
+               "section_has", "section_lacks", "summary_lacks"}
 SCOPES = ("", "full", "lexical")
 
 _LIST_ITEM_RE = re.compile(r"^\s*(?:[2-9]|[1-9]\d)\s*[、.．)）]|^\s*[（(](?:[2-9]|[1-9]\d)[)）]|^\s*[⑵-⒇②-⑳]")
@@ -67,7 +68,7 @@ def _text(node) -> str:
 
 def entry_parts(definitions) -> dict[str, str]:
     """The labelled parts of an entry this project builds: summary,
-    sense-label, simplified-term, traditional-term, infobox, footer."""
+    sense-label, simplified-term, traditional-term, sections, infobox, footer."""
     parts: dict[str, str] = {}
 
     def walk(node) -> None:
@@ -87,11 +88,12 @@ def entry_parts(definitions) -> dict[str, str]:
 
 class Sense:
     """One article as the zip shows it: the rows that share a sequence number."""
-    __slots__ = ("title", "seq", "reading", "score", "label", "summary", "terms", "table")
+    __slots__ = ("title", "seq", "reading", "score", "label", "summary", "terms", "table", "sections")
 
-    def __init__(self, title: str, seq: int, reading: str, score, label: str, summary: str, terms=(), table: str = ""):
+    def __init__(self, title: str, seq: int, reading: str, score, label: str, summary: str, terms=(), table: str = "",
+                 sections: str = ""):
         self.title, self.seq, self.reading, self.score = title, seq, reading, score
-        self.label, self.summary, self.table = label, summary, table
+        self.label, self.summary, self.table, self.sections = label, summary, table, sections
         self.terms = {title, *terms}
 
     def as_record(self) -> dict:
@@ -141,6 +143,15 @@ def _check(golden: dict, senses: list[Sense]) -> str | None:
     if check == "table_lacks":
         bad = [s for s in senses if value in s.table]
         return None if not bad else f"info table of {bad[0].label or bad[0].summary[:30]!r}: {bad[0].table[:80]!r}"
+    if check == "section_has":      # the labelled sections under a summary, as one text: 释义…出处…
+        return None if any(value in s.sections for s in senses) else \
+            f"no sense has it in a section; first sense has {top.sections[:80]!r}"
+    if check == "section_lacks":
+        bad = [s for s in senses if value in s.sections]
+        return None if not bad else f"sections of {bad[0].label or bad[0].summary[:30]!r}: {bad[0].sections[:80]!r}"
+    if check == "summary_lacks":
+        bad = [s for s in senses if value in s.summary]
+        return None if not bad else f"summary {bad[0].summary[-60:]!r}"
     raise ValueError(check)
 
 
@@ -207,9 +218,12 @@ def _read_bank(name: str) -> tuple[collections.Counter, list[tuple], list[tuple]
             stats["summaries_cut_inside_a_quote"] += 1
         if not reading:
             stats["senses_without_a_reading"] += 1
+        if "sections" in parts:
+            stats["senses_with_sections"] += 1
         if title in keep:
             terms_now = []
-            kept.append((title, seq, reading, score, label, summary, terms_now, parts.get("infobox", "")))
+            kept.append((title, seq, reading, score, label, summary, terms_now, parts.get("infobox", ""),
+                         parts.get("sections", "")))
         elif is_work({"title": title, "sense_label": label, "summary": summary}):
             stats["headwords_whose_first_sense_is_a_work"] += 1
     return stats, kept, orphans
@@ -256,8 +270,8 @@ def audit(zip_path: str, golden: list[dict] | None = None,
     for bank_stats, kept, bank_orphans in _run(_read_bank, names, workers, zip_path, frozenset(several | wanted)):
         stats.update(bank_stats)
         orphans.extend(bank_orphans)
-        for title, seq, reading, score, label, summary, terms, table in kept:
-            sense = senses[title, seq] = Sense(title, seq, reading, score, label, summary, terms, table)
+        for title, seq, reading, score, label, summary, terms, table, sections in kept:
+            sense = senses[title, seq] = Sense(title, seq, reading, score, label, summary, terms, table, sections)
             groups[title].append(sense)
     for title, seq, term in orphans:
         if (title, seq) in senses:
@@ -300,6 +314,7 @@ RATES = (  # (label, numerator, denominator)
     ("summaries starting mid-list", "summaries_starting_mid_list", "senses"),
     ("summaries cut inside a quote", "summaries_cut_inside_a_quote", "senses"),
     ("senses without a reading", "senses_without_a_reading", "senses"),
+    ("senses with labelled sections", "senses_with_sections", "senses"),
     ("headwords whose first sense is a work", "headwords_whose_first_sense_is_a_work", "headwords"),
     ("… with another kind of sense below it", "headwords_with_a_work_above_another_sense", "headwords"),
     ("headwords with several senses", "headwords_with_several_senses", "headwords"),

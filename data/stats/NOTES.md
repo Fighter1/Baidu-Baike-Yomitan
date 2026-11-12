@@ -408,3 +408,188 @@ shares its title with a word (三分之一, 白头山); pages whose only section
 a career or a history are not used although their first sentence often says
 who the person is; the injected characters in the body text of ordinary
 2021–2023 snapshots (fallback abstracts) are not tested.
+
+## After release 2026.11.11.8: pasted furniture and labelled sections
+
+被褐藏辉 looked cut off: `…被褐藏辉。”汉成语词典已有该词条：被褐`. The article
+has no summary field, so the entry is its `词语解析` section, which was pasted
+from 汉典 with the site's name (`汉`, `汉 典`) around the definition and a
+pointer to its 成语 dictionary that the corpus itself cuts after two characters.
+
+Measured over the 5,634,898 rows of the 2019 corpus:
+
+| | |
+|---|---:|
+| pages with `成语词典已有该词条` | 34 |
+| … of which had it in the summary | 18 |
+| sections that open with a lone `汉` before a space | 1,039 |
+| pages with a lone `汉` before text anywhere | 10,621 |
+
+Most lone `汉` are the dynasty of a quoted author, so the name is only
+stripped at the start of a section in front of a sentence, and at the end of
+a paragraph after closing punctuation. The first run left 140 summaries
+ending in `。”汉`; the end rule was added for those. Result: 667 summaries
+changed (18 pointer, the rest the name), 27 in the lexical dictionary, no
+headword gained or lost there.
+
+**Sections.** Headings were counted on all pages and on the 93,907 pages
+whose title is a CC-CEDICT headword: 184,236 pages have a heading with 解释,
+释义, 出处, 用法, 示例, 近义, 辨析 and the like, 27,542 of the CC-CEDICT pages.
+The commonest: 词语解释 26,771, 释义 16,796, 详细解释 10,107, 解释 8,282,
+出处 7,699, 基本解释 6,581, 词语释义 5,630, 示例 4,117, 详细释义 3,731,
+用法 2,827, 引证解释 2,293, 近义词 2,236, 成语出处 1,730.
+
+Left out on purpose: `来源` (3,514, mostly medicines and plant varieties),
+`用法用量` (12,180, medicines), `名词解释` (3,155, concepts, where the summary
+says the same), `例子` (957, any kind of page), `典故` and the `…故事`
+headings (median length 360 to 1,100 characters).
+
+What reading samples of the first run changed:
+
+- `出处`, `用法`, `语法`, `示例` and `辨析` stand on pages that are not about
+  words (古魔塔珈, a character of a novel; glCallList; 虎杖叶胶囊), so a page
+  has to show that it is about a word, and sections count from that heading.
+- 智能鞋套机 showed the synonyms of 祸福由人, the article that follows it in
+  the row. The second article starts with `简介`, a heading the page already
+  had; sections stop there, and the proof has to be within the first three
+  headings. Records with sections in the 2019 corpus: 93,927 before these two
+  rules, 90,404 after.
+- A section of input codes under the heading `释义` (砂, 单行道), the header
+  `词性释义英译例句例词` of a flattened table (圉, 盾, 伏), a synonym list
+  without separators, an overlay `成语用法` section holding only examples.
+- The watermark `咟喥咟萪` at the end of an example (赛事).
+
+Effect on the zips, against release 2026.11.11.8:
+
+| | full, before | full, now | lexical, before | lexical, now |
+|---|---:|---:|---:|---:|
+| headwords | 4,799,835 | 4,799,836 | 82,060 | 82,060 |
+| senses | 4,877,527 | 4,877,528 | 104,656 | 104,656 |
+| senses showing sections | 0 | 73,169 | 0 | 27,504 |
+| zip bytes | 1,412,370,266 | 1,430,709,131 | 28,032,676 | 35,369,154 |
+
+Golden words: 55 of 55 (full) and 35 of 35 (lexical). Senses without a
+reading 148,266 and summaries cut inside a quote 8,154, both unchanged.
+
+**Not fixed**: on a page without a summary field whose meaning is under 15
+characters, the summary is still the first long paragraph, often an example
+or a quotation, and the meaning now stands under 释义 below it (避君三舍,
+壁垒森严); a section can be mislabelled by the article itself (老骥伏枥，志在千里
+has synonyms under 辨析; the common case, a 辨析 section that holds only
+`【近义词】…【反义词】…`, is handled below); a word page whose dictionary
+sections come after its third heading, with a summary that does not call it a
+word, shows none. Two items that stood here are done in the next section:
+sub-headings inside a section (`含义 1. 谓兴建高楼`) and raw HTML entities in
+the 2019 text (`m&eacute;ngt&oacute;u`).
+
+## Local build of 2026-11-11: HTML entities, headings inside a section
+
+**Entities.** Measured on the merged records of the build above: 6,971 of
+4,877,528 records had an entity (12,498 entities, 272 different names; 6,132
+in summaries, 695 in info tables, 239 in sections, 144 in titles), 172 of
+them under a CC-CEDICT headword. The 2019 corpus has them as text; the overlay
+has almost none. Both extractors now decode them first, up to four passes,
+with a table for the transliteration names Python lacks. Decoding first is
+what makes the other rules see the text: 42,213 rows of the 2019 corpus had
+one somewhere, far more than the records that showed one, because citation
+marks (`&#91;2&#93;`) and spaces (`&nbsp;`) are then removed by the rules for
+those.
+
+Left: 8 records (`&O1548;`, `&subs;`, `&bsp;`, `&ALICE;`, one text escaped
+seven times) and 177 names without a semicolon (`&amp` 135, `&nbsp` before a
+digit 29, `&lt`/`&gt`/`&quot` 13). Decoding those would also change `AT&T`-like
+text, so they stay.
+
+**Headings inside a section.** Measured on the same records with a list of
+heading words (解释, 释义, 出处, 用法, 示例, 例句, 近义词, 反义词, 辨析, 拼音
+…): 5,647 section texts started with one and 3,992 had one after a sentence
+end, 8,644 records in all. Two layouts make up most of it: one heading to a
+line inside a `详细解释` section (插足), and a whole entry run together under
+`释义` (海角天涯: `发音 … 释义形容极远的地方…出处唐·白居易…示例宋…`). The
+text is now split at such headings and each part shown under its label.
+
+What the first two rebuilds showed, and what changed for it:
+
+- The merge replaced all 2019 sections with the snapshot's whenever a refresh
+  had any. That was wrong before this change too, but it became visible when
+  snapshots began to yield single parts: 旁门左道 kept only its antonym,
+  三令五申 lost five of seven. Sections are now joined label by label.
+- The rule for input codes looked at the first 80 characters. Once the
+  headword and reading at the top were removed, the codes of many character
+  pages moved into that window and the meaning in front of them was dropped
+  (臆, 徘, 伪, 媒). The text now ends where the codes begin; when the codes
+  come first, within three lines, it starts after them (娱).
+- A `【词义】` or `基本词义` heading inside a `详细解释` section moved its text
+  to a part that then lost to the page's own 释义 section (惝, 乖剌). Such a
+  heading no longer moves text out of 详解.
+- A section holding only the words `基本解释` became a part (平手, about 45
+  more per 500,000 rows). A lone heading word is used as text only when it
+  has two characters.
+- `词性：形容词` took the meaning after it along into 用法 (炽痛, 晨钟暮鼓).
+  Only the kind of word goes there.
+
+Against the build above (merged records and zips):
+
+| | before | now |
+|---|---:|---:|
+| records with an entity | 6,971 | 8 |
+| … under a CC-CEDICT headword | 172 | 1 |
+| section texts with a stray heading word (records) | 8,644 | 3,520 |
+| records with sections | 119,788 | 120,991 |
+| senses showing sections, full | 73,169 | 76,251 |
+| senses showing sections, lexical | 27,504 | 28,971 |
+| shown 释义 | 41,580 | 43,951 |
+| shown 出处 | 25,596 | 26,448 |
+| shown 详解 | 12,649 | 16,461 |
+| shown 示例 | 7,279 | 11,447 |
+| shown 用法 | 4,117 | 4,968 |
+| shown 近义词 | 1,858 | 4,587 |
+| shown 反义词 | 754 | 2,597 |
+| shown 辨析 | 2,529 | 1,149 |
+| headwords, full | 4,799,836 | 4,799,728 |
+| senses, full | 4,877,528 | 4,877,418 |
+| headwords, lexical | 82,060 | 82,060 |
+| senses, lexical | 104,656 | 104,657 |
+| zip bytes, full | 1,430,709,131 | 1,432,192,152 |
+| zip bytes, lexical | 35,369,154 | 36,412,843 |
+
+In the samples read, the 3,520 that remain are mostly prose (`出处不详`,
+`解释说`) and headings glued between two characters. 辨析 fell because most
+of the 1,614 sections that lost the label held only synonym and antonym
+lists, which now stand under those labels. Sections changed on 25,350
+records, 14,594 of them under a CC-CEDICT headword. 250 headwords
+went and 142 came, all in the full dictionary but one each way (蒙塾 gone,
+栗腹䴓 new): titles whose entity is now a character (140), and summaries that
+passed or failed the length rule once `&nbsp;` and citation marks were gone.
+6,036 summaries changed, 6,015 of them because of an entity.
+
+Labels lost against the build above, by what happened to the old text:
+
+| label | moved to another label | was not text | gone |
+|---|---:|---:|---:|
+| 释义 | 38 | 320 | 90 |
+| 详解 | 12 | 240 | 27 |
+| 用法 | 112 | | 42 |
+| 辨析 | 674 | | 940 |
+| 出处, 示例, 近义词, 反义词 | 12 | | 14 |
+
+"Was not text" is `词目：仲秋 拼音：zhòngqiū 基本解释` and the like. The 940
+辨析 are the synonym lists again, reformatted so the old text is not found
+whole. Of the 90 释义 many were lists of strokes and codes; the real
+losses are rare characters whose whole meaning is shorter than six characters
+or has no punctuation before the codes (僼, 嚠, 嬚), where the summary says
+it, and pages where the meaning follows a `田字格中的“长”字` caption (长, 浩,
+伍, 娴).
+
+Golden words: 72 of 72 (full) and 50 of 50 (lexical), with 17 lines added
+for these rules. Senses without a reading 148,224 (148,266 before),
+summaries cut inside a quote 8,160 (8,154).
+
+**Not fixed**: a heading glued between two characters (`多指婚姻示例但～`); a
+meaning that follows `例句：` on later lines goes under 示例 (理智); the
+`田字格` caption above; the headword and reading at the start of some 详解
+texts (`老骥伏枥lǎo jì fú lì …`); a 词性 heading followed by a description
+instead of a kind of word stays in the text (晨钟暮鼓); summaries that open
+with `释义` or `出处` (海角天涯, 一无所获) — the summary rules were not
+touched; and, as before, an example or quotation as the summary where the
+meaning is short (about 1,150 entries have the meaning under 释义 instead).

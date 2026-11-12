@@ -95,7 +95,7 @@ jobs:
 
       - name: Extract, merge, build, validate, smoke
         run: |
-          python -m baike2yomitan all --overlay-hf --pinyin --traditional s2tw --infobox \
+          python -m baike2yomitan all --overlay-hf --pinyin --traditional s2tw --infobox --sections \
             --exclude-tags 人物,企业,学校 --update-url github --revision "$REVISION" --no-hash \
             ${{ inputs.skip_validation && '--no-validate' || '' }} | tee data/all.log
           df -h / | tail -1

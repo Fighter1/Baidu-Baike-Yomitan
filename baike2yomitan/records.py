@@ -3,6 +3,9 @@
 One record per sense.  Field order is fixed so JSONL diffs stay readable.
 `infobox` is an optional extension (list of [key, value] pairs) used by
 `build --infobox`; extractors that cannot produce it leave it null.
+`sections` is the same kind of extension for `build --sections`: a list of
+[label, text] pairs, the dictionary-style sections of a word's page (释义,
+出处, 用法 ...), see sections.py.
 """
 from __future__ import annotations
 
@@ -44,6 +47,7 @@ RECORD_FIELDS = (
     "snapshot_date",
     "quality_flags",
     "infobox",
+    "sections",
 )
 
 
@@ -61,6 +65,7 @@ class Record:
     snapshot_date: Optional[str] = None
     quality_flags: list = field(default_factory=list)
     infobox: Optional[list] = None
+    sections: Optional[list] = None
 
     def to_dict(self) -> dict:
         d = dataclasses.asdict(self)

@@ -11,10 +11,11 @@ import time
 import urllib.parse
 from typing import Iterator
 
-from .cleaning import (SAME_ARTICLE, clean_text, clean_title, short_summary_keep_reason, similarity,
+from .cleaning import (SAME_ARTICLE, clean_text, clean_title, decode_entities, short_summary_keep_reason, similarity,
                        summary_drop_reason, title_drop_reason, trim_summary)
 from .junk import injected, known_headings
 from .records import Record, RecordWriter
+from .sections import pick_sections
 
 SOURCE = "hf"
 _ITEM_ID_RE = re.compile(r"/item/[^/]+/(\d+)/?$")
@@ -125,6 +126,26 @@ def spaced_opening(plain: str, title: str = "") -> str | None:
     if len(heading) > MAX_HEADING_CHARS:
         m = _HEADING_TAIL_RE.search(heading)        # the page opens with text of its own: that is the introduction
         return _opening_text(heading[:m.start() + 1], title) if m else None
+    for heading, body in spaced_sections(plain):
+        if is_intro_heading(heading):
+            return _opening_text(body, title)
+    return None
+
+
+def spaced_sections(plain: str) -> list[tuple[str, str]]:
+    """(heading, text) of each section of an un-spaced 2023-24 page.
+
+    Nothing separates the text of a section from the heading of the next, so
+    that heading is what follows the last sentence end before the next mark
+    (…景观之胜。 [1] 出处播报编辑徐霞客的…)."""
+    marks = list(_SECTION_MARK_RE.finditer(plain))
+    if not marks:
+        return []
+    heading = plain[:marks[0].start()].strip()
+    if len(heading) > MAX_HEADING_CHARS:
+        m = _HEADING_TAIL_RE.search(heading)
+        heading = m.group(1).strip() if m else ""
+    out = []
     for i, mark in enumerate(marks):
         end = marks[i + 1].start() if i + 1 < len(marks) else len(plain)
         body, next_heading = plain[mark.end():end], ""
@@ -132,10 +153,29 @@ def spaced_opening(plain: str, title: str = "") -> str | None:
             m = _HEADING_TAIL_RE.search(body)
             if m:
                 body, next_heading = body[:m.start() + 1], m.group(1)
-        if is_intro_heading(heading):
-            return _opening_text(body, title)
+        out.append((heading, body))
         heading = next_heading.strip()
-    return None
+    return out
+
+
+_PAGE_HEADING_MARK = r"(?:编辑播报|播报编辑|编辑语音|语音编辑|编辑)(?=\s)"
+
+
+def page_sections(content: str, title: str) -> list[tuple[str, str]]:
+    """(heading, text) of each top-level section of an ordinary snapshot.
+
+    After the abstract and its repeat, every section starts with the article
+    title and the heading run together, then the interface's edit label:
+    '  春暖花开成语出处编辑 明·朱国祯《涌幢小品·南内》：…'. The headings of a
+    lower level (踏歌基本解释 without the label) stay in the text."""
+    if not content or not title:
+        return []
+    starts = list(re.finditer(r"(?:^|(?<=\s))" + re.escape(title) + r"(?P<heading>\S{1,20}?)" + _PAGE_HEADING_MARK, content))
+    out = []
+    for i, m in enumerate(starts):
+        end = starts[i + 1].start() if i + 1 < len(starts) else len(content)
+        out.append((m.group("heading"), content[m.end():end]))
+    return out
 
 
 def _opening_text(text: str, title: str) -> str | None:
@@ -243,19 +283,24 @@ def snapshot_date(ts) -> str | None:
     return None
 
 
-def convert(row: dict, stats: collections.Counter, max_summary_chars: int) -> Record | None:
-    title = clean_title(row.get("title")) or title_from_url(row.get("base_url"))
+def _has_injected(text: str) -> bool:
+    return bool(injected(text[:JUNK_WINDOW]))
+
+
+def convert(row: dict, stats: collections.Counter, max_summary_chars: int,
+            want_sections: bool = True) -> Record | None:
+    title = clean_title(decode_entities(row.get("title"))) or title_from_url(row.get("base_url"))
     reason = title_drop_reason(title)
     if reason:
         stats["drop:" + reason] += 1
         return None
-    content = row.get("content") or ""
+    content = decode_entities(row.get("content") or "")
     flags = []
-    recovered = None
+    recovered = plain = None
     if is_obfuscated(content):
         # A letter-spaced snapshot. Its text can be put back together, but it
         # is kept only when it has an introduction and no injected characters.
-        plain = unspace(content)
+        plain = decode_entities(unspace(content))
         recovered = spaced_opening(plain, title) if plain is not None else None
         if plain is None:
             stats["spaced:not_every_other_character"] += 1
@@ -288,9 +333,14 @@ def convert(row: dict, stats: collections.Counter, max_summary_chars: int) -> Re
     summary = trim_summary(summary, max_summary_chars)
     base_url = row.get("base_url") or row.get("url") or ""
     lemma_id = lemma_id_from_item_url(base_url)
-    subtitle = clean_title(row.get("subtitle"))
+    subtitle = clean_title(decode_entities(row.get("subtitle")))
     if subtitle == title:
         subtitle = ""
+    word_sections = None
+    if want_sections and "obfuscated" not in flags:
+        # the 2023 snapshots have injected characters in the body text too, letter-spaced or not
+        pairs = spaced_sections(plain) if recovered is not None else page_sections(content, title)
+        word_sections = pick_sections(pairs, title, summary, refuse=_has_injected)
     rec = Record(
         source=SOURCE,
         title=title,
@@ -304,6 +354,7 @@ def convert(row: dict, stats: collections.Counter, max_summary_chars: int) -> Re
         snapshot_date=snapshot_date(row.get("timestamp")),
         quality_flags=flags,
         infobox=None,
+        sections=word_sections,
     )
     # transient marker used for default-sense detection; not serialised
     rec._idless = lemma_id is None  # type: ignore[attr-defined]
@@ -372,7 +423,8 @@ def _same_article(rec: Record, candidates: list[Record], title: str) -> Record |
 
 
 def extract(path: str, out_path: str, limit: int | None = None,
-            max_summary_chars: int = 300, progress_every: int = 100_000) -> collections.Counter:
+            max_summary_chars: int = 300, progress_every: int = 100_000,
+            want_sections: bool = True) -> collections.Counter:
     stats: collections.Counter = collections.Counter()
     t0 = time.time()
     best: dict[tuple, Record] = {}
@@ -380,7 +432,7 @@ def extract(path: str, out_path: str, limit: int | None = None,
         if limit and n > limit:
             break
         stats["input_rows"] += 1
-        rec = convert(row, stats, max_summary_chars)
+        rec = convert(row, stats, max_summary_chars, want_sections)
         if rec is None:
             continue
         # One article = one id. Snapshots without an id can only be told
@@ -441,6 +493,9 @@ def extract(path: str, out_path: str, limit: int | None = None,
                 stats["flag:no_lemma_id"] += 1
             if rec.is_default_sense:
                 stats["default_senses"] += 1
+            for label, _text in rec.sections or []:
+                stats["section:" + label] += 1
+            stats["records_with_sections"] += bool(rec.sections)
             w.write(rec)
         stats["records_written"] = w.count
     stats["seconds"] = int(time.time() - t0)

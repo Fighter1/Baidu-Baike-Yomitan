@@ -2,7 +2,8 @@
 
 This module knows nothing about where records came from: it only uses the
 common record fields (title, sense_label, summary, url, archive_url,
-snapshot_date, tags, lemma_id, is_default_sense, quality_flags, infobox).
+snapshot_date, tags, lemma_id, is_default_sense, quality_flags, infobox,
+sections).
 """
 from __future__ import annotations
 
@@ -16,10 +17,12 @@ import zipfile
 
 from .readings import OVERRIDES_PATH, Readings
 from .records import dumps, iter_records
+from .sections import shown_sections
 from .sense import is_organisation, is_person, sense_rank_key
 
 BANK_SIZE = 10_000
 _MUTED = {"fontSize": "80%", "color": "#888888"}
+_SECTION_LABEL = {"fontSize": "80%", "color": "#888888", "marginRight": "0.5em"}
 
 TITLE_FULL = "百度百科 (full)"
 TITLE_LEX = "百度百科 (lexical)"
@@ -34,6 +37,8 @@ STYLES_CSS = """\
   border: 1px solid #454545; border-radius: 4px; background: #111; }
 [data-sc-baike="traditional-term"] { color: #e42566; }
 [data-sc-baike="simplified-term"] { color: #257de4; }
+[data-sc-baike="section-label"] {
+  padding: 0 4px; border: 1px solid #888888; border-radius: 3px; white-space: nowrap; }
 """
 
 
@@ -75,10 +80,13 @@ class Traditional:
         return out
 
 
-def structured_content(rec: dict, want_infobox: bool, traditional: str | None = None) -> dict:
+def structured_content(rec: dict, want_infobox: bool, traditional: str | None = None,
+                       want_sections: bool = False) -> dict:
     """`traditional` is the OpenCC form of the title when the build emits
     traditional headwords (None otherwise); the entry then opens with the
-    traditional and simplified spellings side by side, like 汉语大词典."""
+    traditional and simplified spellings side by side, like 汉语大词典.
+    `want_sections` adds the labelled sections of a word's page (释义, 出处,
+    用法 ...) under the summary, those that say more than the summary does."""
     parts: list = []
     if traditional is not None:
         terms: list = []
@@ -91,6 +99,13 @@ def structured_content(rec: dict, want_infobox: bool, traditional: str | None = 
         parts.append({"tag": "div", "data": {"baike": "sense-label"}, "style": dict(_MUTED),
                       "content": label})
     parts.append({"tag": "div", "data": {"baike": "summary"}, "content": rec["summary"]})
+    sections = shown_sections(rec) if want_sections else []
+    if sections:
+        parts.append({"tag": "div", "data": {"baike": "sections"}, "style": {"marginTop": "0.3em"}, "content": [
+            {"tag": "div", "data": {"baike": "section"}, "content": [
+                {"tag": "span", "data": {"baike": "section-label"}, "style": dict(_SECTION_LABEL), "content": label},
+                text]}
+            for label, text in sections]})
     infobox = rec.get("infobox") if want_infobox else None
     if infobox:
         rows = []
@@ -268,7 +283,7 @@ def build(records_path: str, out_zip: str, title: str | None = None,
           common_words: set[str] | None = None,
           merged: bool | None = None, revision: str | None = None,
           update_base_url: str | None = None, readings_cedict: str | None = None,
-          pinyin_overrides: str | None = OVERRIDES_PATH) -> collections.Counter:
+          pinyin_overrides: str | None = OVERRIDES_PATH, sections: bool = False) -> collections.Counter:
     """`pinyin` fills the reading field (see readings.py for the sources);
     `readings_cedict` is the CC-CEDICT export to take readings from and
     `pinyin_overrides` the hand-checked title/reading file, both optional."""
@@ -311,7 +326,9 @@ def build(records_path: str, out_zip: str, title: str | None = None,
             seq += 1
             forms = to_trad.forms(t, person=_is_biography(rec), word=t in known_words) if to_trad else []
             tt = forms[0] if forms else None
-            content = structured_content(rec, infobox, tt)
+            content = structured_content(rec, infobox, tt, sections)
+            if sections and any(p["data"]["baike"] == "sections" for p in content["content"]):
+                stats["senses_with_sections"] += 1
             reading = ""
             if to_reading:
                 reading, reading_source = to_reading(rec)

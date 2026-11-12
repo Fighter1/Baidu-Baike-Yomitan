@@ -9,7 +9,7 @@ still available for sources that genuinely share an id space.
 A title names several articles (时间 is a physical quantity, a word and a dozen
 songs), so sharing a title is not enough to replace the 2019 text. For a
 primary title with exactly one primary record, the overlay sense that refreshes
-it (summary, sense_label if empty, archive_url, snapshot_date) is chosen by
+it (summary, sense_label if empty, archive_url, snapshot_date, sections) is chosen by
 what the two texts say:
 
 - ``same_text``: the overlay sense whose summary shares the most with the 2019
@@ -37,6 +37,7 @@ import collections
 
 from .cleaning import MIN_SUMMARY_CHARS, SAME_ARTICLE, cjk_len, says_nothing, similarity
 from .records import RecordWriter, iter_records
+from .sections import ORDER
 from .sense import is_person, is_work, share_a_year
 
 _UNCLEAN = {"obfuscated", "abstract_fallback"}
@@ -65,6 +66,12 @@ def _apply_refresh(rec: dict, ov: dict, key: str) -> None:
         rec["sense_label"] = ov["sense_label"]
     rec["archive_url"] = ov.get("archive_url")
     rec["snapshot_date"] = ov.get("snapshot_date")
+    if ov.get("sections"):
+        # Label by label: the snapshot's section where it has one, the 2019 one where it has none.
+        # The snapshot of 旁门左道 yields only its antonym; the 2019 meaning, source and usage stay.
+        by_label = {**dict(map(tuple, rec.get("sections") or [])), **dict(map(tuple, ov["sections"]))}
+        rec["sections"] = ([[label, by_label.pop(label)] for label in ORDER if label in by_label]
+                           + [[label, text] for label, text in by_label.items()])
     if ov.get("is_default_sense") is not None and rec.get("is_default_sense") is None:
         rec["is_default_sense"] = ov["is_default_sense"]
     if key == "lemma_id" and rec.get("lemma_id") is None:

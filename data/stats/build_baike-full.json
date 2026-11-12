@@ -1,15 +1,16 @@
 {
- "entries": 8822185,
- "entries_traditional": 3944658,
- "reading:article": 86569,
- "reading:article-shared": 1599,
- "reading:cedict": 106823,
- "reading:none": 148266,
+ "entries": 8822039,
+ "entries_traditional": 3944621,
+ "reading:article": 86606,
+ "reading:article-shared": 1600,
+ "reading:cedict": 106824,
+ "reading:none": 148224,
  "reading:override": 1,
- "reading:pypinyin": 4534269,
- "records_seen": 4877527,
- "seconds": 748,
+ "reading:pypinyin": 4534163,
+ "records_seen": 4877418,
+ "seconds": 2076,
+ "senses_with_sections": 76251,
  "term_banks": 883,
- "titles_with_multiple_senses": 46903,
- "zip_bytes": 1412370267
+ "titles_with_multiple_senses": 46902,
+ "zip_bytes": 1432192152
 }

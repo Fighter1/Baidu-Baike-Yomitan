@@ -82,3 +82,39 @@
 五岳归来不看山，黄山归来不看岳	any	极言黄山景观之胜	full
 姐丈	any	姐姐的丈夫	full
 计劳纳封	any	根据付出的劳动而接受封赏	full
+
+# -- Furniture of a dictionary site pasted into the article (2026.11.11.8: 被褐藏辉 ended 汉成语词典已有该词条：被褐)
+被褐藏辉	summary_lacks	词典已有该词条	full
+被褐藏辉	ends	被褐藏辉。”	full
+被褐藏辉	first	犹言被褐怀玉	full
+羽翎	ends	重来振羽翎。”	full
+
+# -- Labelled sections of pages about words (释义, 出处, 用法 ...), and only of those
+五岳归来不看山，黄山归来不看岳	section_has	漫游黄山仙境	full
+一丘之貉	section_has	杨恽传	full
+智能鞋套机	section_lacks	祸福	full
+
+# -- HTML entities of the 2019 text are decoded (the build before had Soldatenk&ouml;nig, zǒush&eacute;nr, g&egrave;ch&ugrave;)
+腓特烈·威廉一世	any	Soldatenkönig	full
+腓特烈·威廉一世	summary_lacks	&	full
+走神儿	summary_lacks	&
+各处	section_lacks	&
+
+# -- A heading inside a section starts a part of its own (插足 had 含义 and 出处 inside its 详解, 海角天涯 发音, 释义, 出处 and 示例 inside its 释义)
+插足	section_has	何必插足
+插足	section_lacks	含义
+海角天涯	section_lacks	发音
+举棋不定	section_has	当机立断
+平手	section_lacks	例句今天
+挂失	section_lacks	词性
+
+# -- A refresh keeps the 2019 sections the snapshot has none for (旁门左道 kept only its antonym)
+旁门左道	section_has	指非正统的学术流派
+旁门左道	section_has	歪门邪道
+三令五申	section_has	千叮万嘱
+
+# -- On a character page the text ends where the input codes begin (娱 opened 基本解释拼音：yú，笔划：10 部首：女)
+臆	section_has	胸骨也
+臆	section_lacks	五笔
+娱	section_has	娱，乐也
+娱	section_lacks	笔划

@@ -50,13 +50,14 @@ def cmd_extract(a) -> int:
         inp = a.input or DEFAULT_563W
         out = a.out or RECORDS
         stats = extract(inp, out, limit=a.limit, max_summary_chars=a.max_summary_chars,
-                        want_infobox=not a.no_infobox)
+                        want_infobox=not a.no_infobox, want_sections=not a.no_sections)
     else:
         from .extract_hf import extract
 
         inp = a.input or DEFAULT_HF
         out = a.out or RECORDS_HF
-        stats = extract(inp, out, limit=a.limit, max_summary_chars=a.max_summary_chars)
+        stats = extract(inp, out, limit=a.limit, max_summary_chars=a.max_summary_chars,
+                        want_sections=not a.no_sections)
     stats["input"] = inp
     stats["output"] = out
     save_stats(f"extract_{a.source}", stats)
@@ -107,7 +108,7 @@ def _build_one(records, out, a, cedict_words=None, exclude_tags=None, readings_c
 
         update_base_url = github_release_base_url(repo_from_git_remote())
     stats = build(records, out, title=getattr(a, "title", None), pinyin=a.pinyin, traditional=a.traditional,
-                  infobox=a.infobox, cedict_words=cedict_words, exclude_tags=exclude_tags,
+                  infobox=a.infobox, sections=a.sections, cedict_words=cedict_words, exclude_tags=exclude_tags,
                   common_words=common_words,
                   revision=a.revision, update_base_url=update_base_url,
                   readings_cedict=readings_cedict)
@@ -324,6 +325,8 @@ def main(argv=None) -> int:
                         help="verify pinned inputs by size only (skip the SHA-256, ~2 min for the primary)")
         sp.add_argument("--max-summary-chars", type=int, default=300)
         sp.add_argument("--no-infobox", action="store_true", help="do not extract 基本信息 key/value pairs")
+        sp.add_argument("--no-sections", action="store_true",
+                        help="do not extract the 释义/出处/用法 … sections of pages about words")
 
     def add_common_build(sp):
         sp.add_argument("--pinyin", action="store_true",
@@ -336,6 +339,8 @@ def main(argv=None) -> int:
                              "character forms (著, 裡, 為), s2t keeps 着, 裏, 爲, s2twp also rewrites "
                              "vocabulary, s2hk gives Hong Kong forms")
         sp.add_argument("--infobox", action="store_true", help="render 基本信息 pairs below the summary")
+        sp.add_argument("--sections", action="store_true",
+                        help="render the labelled sections of a word's page (释义, 出处, 用法 …) below the summary")
         sp.add_argument("--exclude-tags", default="", help="comma-separated Baike tags to drop (lexical build)")
         sp.add_argument("--schemas-dir", default=os.path.join("data", "schemas"))
         sp.add_argument("--validate-workers", type=_workers_arg, default=None, metavar="N",

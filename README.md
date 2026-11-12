@@ -88,13 +88,13 @@ Do not use `datasets.load_dataset` on the primary file: it would build a second
 python -X utf8 -m baike2yomitan extract --source 563w [--limit N] [--max-summary-chars 300]
 python -X utf8 -m baike2yomitan extract --source hf   [--limit N]
 python -X utf8 -m baike2yomitan merge                 # records.jsonl + records.hf.jsonl → records.merged.jsonl (keyed on title)
-python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-full.zip [--pinyin] [--traditional s2tw|s2t|s2twp|s2hk] [--infobox]
+python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-full.zip [--pinyin] [--traditional s2tw|s2t|s2twp|s2hk] [--infobox] [--sections]
 python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-lexical.zip --cedict data/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz --exclude-tags 人物,企业,学校
 python -X utf8 -m baike2yomitan validate dist/baike-full.zip
 python -X utf8 -m baike2yomitan audit dist/baike-full.zip dist/baike-lexical.zip
 python -X utf8 -m baike2yomitan smoke dist/baike-full.zip
 python -X utf8 -m baike2yomitan sample --records data/records.merged.jsonl -n 20
-python -X utf8 -m baike2yomitan all --overlay-hf --pinyin --traditional s2tw --infobox --exclude-tags 人物,企业,学校 --update-url github
+python -X utf8 -m baike2yomitan all --overlay-hf --pinyin --traditional s2tw --infobox --sections --exclude-tags 人物,企业,学校 --update-url github
 python -X utf8 -m baike2yomitan release --dry-run        # upload dist zips as a GitHub release (see below)
 ```
 
@@ -106,6 +106,13 @@ the smoke test or a golden-word check fails. `--limit N` on `extract` stops
 after N input rows for fast iteration. `inputs`, `audit` and `release` are
 described in their own sections below.
 
+Leave `--update-url github` off a build you only want to try locally. With it
+the zip points at the latest release, and an app that checks for updates
+(Hachidori does on import) replaces what you imported with that release
+whenever the revisions differ, so a local change never shows. `--no-validate
+--no-audit` skip the checks at the end of `all` (about 3 of 40 minutes); keep
+them when a rule changed.
+
 ### Flags
 
 | flag | step | effect |
@@ -116,11 +123,13 @@ described in their own sections below.
 | `inputs pin\|verify\|download [--source 563w\|hf]` | inputs | maintain `data/source-inputs.json` (see *Downloading the corpora*) |
 | `--max-summary-chars N` | extract, all | trim summaries to N chars at the last `。！？；` inside the window (default 300); a hard cut adds `…` |
 | `--no-infobox` | extract, all | do not parse `基本信息`/`基本资料` sections into `[key, value]` pairs (they are parsed only at the top of the page, see *Record schema*) |
+| `--no-sections` | extract, all | do not keep the `释义`/`出处`/`用法` … sections of pages about words on the record (see *Sections of pages about words*) |
 | `--merge-key title\|lemma_id` | merge | how overlay records match primary ones; `title` is the default because the two sources' ids differ (see below) |
 | `--pinyin` | build, all | fill Yomitan's reading field (`hóng sè shí pǐn`) from CC-CEDICT, the article's own pinyin, then pypinyin (see *Readings*); off by default, the reading is then empty |
 | `--readings-cedict PATH\|none` | build, all | CC-CEDICT export to take readings from; default is the `--cedict` file, else `data/cedict/…` when present |
 | `--traditional s2tw\|s2t\|s2twp\|s2hk` | build, all | also emit a traditional-script headword for every entry whose OpenCC conversion differs from the simplified title; same content and sequence number. The modes differ in character forms, see *Showing simplified and traditional together* |
 | `--infobox` | build, all | render the extracted infobox pairs (first six) as a two-column table under the summary |
+| `--sections` | build, all | show those sections under the summary, each with its label, where they say more than the summary |
 | `--cedict PATH` | build, all | `build`: keep only records whose title is a simplified CC-CEDICT headword (the lexical build). `all`: the MDBG export to use instead of `data/cedict/…`; a file named here is downloaded when missing and otherwise used as it is. `all` always builds both zips |
 | `--keep-cedict` | all | build with the copy in `data/cedict/` however old it is (to repeat an earlier build, or offline); without it the copy is downloaded again when it is more than a day old |
 | `--exclude-tags a,b` | build, all | drop records carrying any of these Baike tags; `all` applies it to the lexical build only. With `--cedict`, a headword CC-CEDICT lists as an ordinary word is only dropped when its text reads as a person, company or school (see *The lexical dictionary's tag filter*) |
@@ -217,13 +226,13 @@ is part of the article's own title (语音编辑器) is not removed.
 Overlay links keep the characters that mean something in a URL encoded
 (`/item/C%23/195147`), so they still lead to the article.
 
-Outputs (figures from a local build of 2026-11-10 with the rules described here, `--pinyin --traditional s2tw --infobox`; release `2026.11.10.7` has them all except the letter-spaced snapshots):
+Outputs (figures from a local build of 2026-11-11 with the rules described here, `--pinyin --traditional s2tw --infobox --sections`; release `2026.11.11.8` has them all except the labelled sections, the stripped dictionary-site furniture and the decoded HTML entities):
 
 - `data/records.jsonl` (4.67 M records), `data/records.hf.jsonl` (414 k), `data/records.merged.jsonl` (4.88 M) — one JSON record per sense
 - `data/extract_report.md` — drop counts by reason, quality flags, merge counts, heuristics notes
 - `data/short_summary_examples.md` — sampled analysis of the under-15-character drops that motivated the paragraph-walking fallback
 - `dist/baike-full.zip` — everything that survived extraction: 8.8 M entries (incl. 3.9 M traditional headwords), 883 term banks, ~1.4 GB
-- `dist/baike-lexical.zip` — only titles that are simplified CC-CEDICT headwords (107 k records), minus `--exclude-tags 人物,企业,学校` (2,167 dropped, 1,662 kept because they are ordinary words): 167 k entries, 28 MB
+- `dist/baike-lexical.zip` — only titles that are simplified CC-CEDICT headwords (107 k records), minus `--exclude-tags 人物,企业,学校` (2,167 dropped, 1,663 kept because they are ordinary words): 167 k entries, 36 MB
 - `dist/<name>.index.json` — a copy of each zip's `index.json`, written when `--update-url` is given (see *Self-updating dictionaries*)
 - `data/stats/*.json` — the counters behind the report and the release notes, including `audit_<zip>.json`
 
@@ -279,6 +288,131 @@ first section of an article, not its abstract. 12,343 such records are
 written; they add 4,742 headwords to the full dictionary and 199 to the
 lexical one (剔透, 报幕, 完婚, 执导, 坊间, 束手就擒, and the proverb
 五岳归来不看山，黄山归来不看岳 that prompted this).
+
+### HTML entities
+
+Both sources carry text that was escaped once too often:
+`m&eacute;ngt&oacute;u`, `腓特烈&middot;威廉一世`, `&ldquo;…&rdquo;`,
+`马茂德&#8226;加万`. Entities are turned into their characters as the first
+step of both extractors, in the title, the summary, the section headings and
+the section text, before any other rule sees the text. So a citation mark
+written `&#91;2&#93;` is removed like `[2]`, and pinyin written with entities
+counts as pinyin: a summary that shows the reading no longer gets a second
+one in the info table.
+
+- Up to four passes, for text escaped several times (`&amp;amp;nbsp;`).
+- Names Python's table lacks (`&amacron;`, `&ndotblw;` and other
+  transliteration letters) and names in capitals (`&NBSP;`) are covered;
+  `&nbsp` without its semicolon becomes a space unless a letter or a digit
+  follows, a soft hyphen is removed.
+- The corpus cuts some texts in the middle of an entity (`也说“走背字儿&rdqu`).
+  Such a stump is removed at the end of a summary or section text. Titles are
+  left alone: `you&me` and `m&ms` are names.
+- An `&` that starts no entity stays (`AT&T`, `R&D`).
+
+6,971 of 4.88 M records had an entity (12,498 entities, 272 different ones;
+6,132 in summaries, 695 in info tables, 239 in sections, 144 in titles).
+8 records still have one: names nobody knows (`&O1548;`, `&subs;`, `&bsp;`)
+and one text that was escaped seven times. 177 names written without a
+semicolon are left as well (`&amp大唐`, `&nbsp11`, `&lt；br&gt；`); only
+`&nbsp` is read that way, and only when no letter or digit follows it.
+
+### Sections of pages about words
+
+A Baike page about a word or a 成语 is laid out like a dictionary entry, and
+the summary names only part of it. With `--sections` an entry shows, under the
+summary, the page's dictionary-style sections, each with a label:
+
+| label | headings it stands for |
+|---|---|
+| 释义 | `基本解释`, `基本释义` first; else `解释`, `释义`, `词语解释`, `成语解释`, `词义`, `含义`, `词语解析` … |
+| 详解 | `详细解释`, `详细释义`, `引证解释`: the senses with their quotations |
+| 出处 | `出处`, `成语出处`, `典故出处`, `出自`, `词源`, `语源` |
+| 用法 | `用法`, `成语用法`, `语法` |
+| 示例 | `示例`, `成语示例`, `运用示例`, `例句`, `造句` |
+| 近义词, 反义词 | the same, and `同义词` |
+| 辨析 | `辨析`, `成语辨析`, `词语辨析` |
+
+Sections that tell a story (`成语故事`, `典故`) are left to the article, as
+are the pronunciation sections: the reading field has that.
+
+- **Only pages about words.** `出处`, `用法`, `语法` and `示例` are also
+  headings of pages about a character of a novel, a medicine or a programming
+  function. Sections count from the first heading that shows the page to be
+  about a word: a section for the meaning or for synonyms, or a heading that
+  says so (`成语出处`, `词语注音`). When the summary says it (`…，汉语成语，…`)
+  they count from the top.
+- **Only the page's own article** (2019 corpus). A row can end with the
+  sections of another article, as with the info tables: 智能鞋套机, a machine,
+  is followed by the 成语 祸福由人 and showed its synonyms. Sections are read
+  up to the first heading the page has had before (`简介` a second time), and
+  the heading that shows a word has to be among the first three unless the
+  summary says so.
+- **From both sources.** The 2019 corpus has the sections as such. An ordinary
+  overlay snapshot has them as `<title><heading>编辑 <text>`, a letter-spaced
+  one as `<heading>播报编辑<text>`. Overlay sections go through the test for
+  injected characters (see *Letter-spaced snapshots*), which the body text of
+  2023 snapshots has as well; a section that fails is left out. When the merge
+  refreshes a 2019 summary, the sections are joined label by label: the
+  snapshot's section where it has one, the 2019 section where it has none
+  (the 2022 snapshot of 旁门左道 yields only its antonym; the 2019 meaning,
+  source and usage stay).
+- **Headings inside a section.** Many pages put the whole entry into one
+  section: the `详细解释` of 插足 is `含义 …`, `出处 …`, `示例 …`, one to a
+  line, and the `释义` of 海角天涯 runs `发音 hǎi jiǎo tiān yá 释义形容极远的地方…出处唐·白居易…示例宋…`
+  together. A heading inside the text starts a part of its own, which is
+  shown under its label like a section. Recognised are a line that is nothing
+  but a heading word, a heading with a colon or in brackets (`示例：`,
+  `【出处】`), words that are only ever headings (`基本解释`, `近义词`), and
+  headings the page spaced out to one width (`解 释：`, `出　处`, `近 义 词`).
+  In a text that opens with a heading word the plain words (`释义`, `出处`,
+  `用法`) head what follows them after a sentence, a space or the reading;
+  elsewhere `出处不详` and `解释说` are prose. A part found this way gives way
+  to a section of the page with the same label. The headword and its reading
+  repeated at the top (`词目：冷汗`, `拼音：lěng hàn`) are left out, a part of
+  speech stays as `名词：`, and `典故`, `故事`, `歇后语` and `灯谜` parts are
+  not shown. `辨析` sections that hold only `【近义词】…【反义词】…` come out
+  as those two lists.
+- **Nothing twice.** The record keeps one section per label, at most 200
+  characters each (`sections`, see *Record format*). The build leaves out a
+  section the summary already says (the same text, or half of its character
+  pairs in common), shows only what follows when a section starts with the
+  summary, and stops at 700 characters per entry.
+- **Not text.** The page of a character lists how it is typed and written
+  (`简体部首：月，部外笔画：13`, `五笔86&98:EUJN`, `笔顺编号：…`). The text of
+  a section ends where such a list starts (臆, 徘); when the list comes first,
+  in the first three lines, the text starts after it (娱); a section that is
+  only such a list is skipped. 仓颉 the man and 《仓颉篇》 are not codes. The
+  flattened header of a table of senses is cut off, a line drawn across the
+  page (`--------`) is dropped, and a list of 成语 written without anything
+  between them is split every four characters.
+
+120,991 records carry sections (90,197 of the 2019 corpus, 44,473 of the
+overlay before the merge). After leaving out what the summary says, 76,251
+senses of the full dictionary (1.6%) and 28,971 of the lexical one (28%) show
+some: 释义 43,951, 出处 26,448, 详解 16,461, 示例 11,447, 用法 4,968, 近义词
+4,587, 反义词 2,597, 辨析 1,149. The full zip grows by 20 MB (1.4%), the
+lexical one from 28 MB to 36 MB.
+
+Not handled: a heading glued between two characters with nothing to mark it
+(`多指婚姻示例但～，一生至一死`) stays in the text, a meaning that follows
+`例句：` on later lines goes under 示例, and about twenty character pages
+whose meaning follows a `田字格中的“长”字` caption lose that section (the
+summary and the 详解 section remain).
+
+### Furniture of a dictionary site
+
+Some 2019 articles were pasted from the dictionary site 汉典 with its
+furniture: the site's name before and after the definition, and a pointer to
+the same word in another of its dictionaries, which the corpus cuts after two
+characters. 被褐藏辉 read `汉犹言被褐怀玉。…被褐藏辉。”汉成语词典已有该词条：被褐`.
+The pointer (34 pages) and the name are stripped from section text before
+cleaning: `汉` or `汉 典` in front of a sentence at the start of a section, and
+after the last sentence of a paragraph. A `汉` that is the dynasty of a quoted
+author (`汉 蔡邕 《…》`, `汉 郑玄 注：`) or half of a word the corpus spaced
+apart (`汉 制`, `汉 朝`) stays. 667 summaries change, 27 of them in the lexical
+dictionary. The watermark `咟喥咟萪` (百度百科 in look-alike characters) is
+removed wherever it stands.
 
 ### Merge semantics
 
@@ -349,7 +483,7 @@ text of the summary, as the rule above does for ordinary words.
 ```json
 {"source": "563w", "title": "李永赋", "sense_label": "云南晋宁县公安局副局长", "lemma_id": 10000022,
  "is_default_sense": null, "summary": "…", "tags": ["人物"], "url": "https://baike.baidu.com/view/10000022.htm",
- "archive_url": null, "snapshot_date": null, "quality_flags": [], "infobox": null}
+ "archive_url": null, "snapshot_date": null, "quality_flags": [], "infobox": null, "sections": null}
 ```
 
 `quality_flags` values: `summary_from_section` (primary had no usable summary
@@ -369,6 +503,8 @@ are removed), `no_lemma_id`.
 `is_default_sense` is `true` for the overlay sense that the id-less URL
 `/item/<title>` showed, `false` for the title's other senses, and `null` when
 no such snapshot exists (and on primary records that were not refreshed).
+`sections` is an optional list of `[label, text]` pairs rendered by
+`build --sections`, see *Sections of pages about words*.
 `infobox` is an optional list of `[key, value]` pairs rendered by `build --infobox`:
 the first six `key：value` lines of a `基本信息`/`基本资料` section, taken only
 when that section is the first of the page or the second. A row of the primary
@@ -420,7 +556,9 @@ text.
 
 An entry shows, top to bottom: the traditional and simplified spellings (with
 `--traditional`), the sense label when the article has one, the
-summary, the infobox table (with `--infobox`, first six rows), and a footer
+summary, the labelled sections of a page about a word (with `--sections`:
+`释义`, `详解`, `出处`, `用法`, `示例`, `近义词`, `反义词`, `辨析`), the infobox table
+(with `--infobox`, first six rows), and a footer
 with the article link, the archive snapshot link and date when the text came
 from the overlay, and up to five Baike tags.
 
@@ -554,7 +692,7 @@ GitHub's `…/releases/latest/download/<asset>` URL always points at the newest
 non-draft release, so it is a stable target for both fields. The flow:
 
 ```bash
-python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-full.zip --pinyin --traditional s2tw --infobox --update-url github
+python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-full.zip --pinyin --traditional s2tw --infobox --sections --update-url github
 ```
 
 ```bash
@@ -710,6 +848,9 @@ release got wrong, as `headword<TAB>check<TAB>value<TAB>scope`:
 | `traditional VALUE` | the headword is also indexed under this spelling |
 | `senses_max N` | it has at most N senses |
 | `table_lacks VALUE` | no sense's info table mentions VALUE |
+| `section_has VALUE` | some sense shows VALUE in its labelled sections (read as one text, `出处…用法…`) |
+| `section_lacks VALUE` | no sense shows VALUE in its labelled sections |
+| `summary_lacks VALUE` | no sense's summary contains VALUE |
 
 `scope` is `full`, `lexical`, or empty for both. A check that does not hold is
 printed with what was found instead (`明朝  reading  míng cháo: readings

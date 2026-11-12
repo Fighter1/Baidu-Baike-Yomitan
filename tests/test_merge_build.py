@@ -400,3 +400,21 @@ def test_tag_exclusion_spares_ordinary_words(tmp_path):
     with zipfile.ZipFile(tmp_path / "d.zip") as zf:
         assert [e[0] for e in json.loads(zf.read("term_bank_1.json"))] == ["潇洒", "证书"]
     assert stats["skip:excluded_tag"] == 3 and stats["kept:excluded_tag_on_ordinary_word"] == 2
+
+
+def test_a_refresh_fills_in_sections_label_by_label(tmp_path):
+    old = _primary("旁门左道", 111097, "旁门左道，汉语成语，原指不正派的宗教派别，借指不正派的学术派别。")
+    old.sections = [["释义", "指非正统的学术流派或宗教派别。"], ["用法", "联合式；作宾语、定语；含贬义。"], ["反义词", "正道"]]
+    new = _overlay("旁门左道", 2005862, "旁门左道，汉语成语，原指不正派的宗教派别，借指不正派的学术派别，现泛指不正派的东西。")
+    new.sections = [["出处", "明·许仲琳《封神演义》"], ["反义词", "不二法门"]]
+    bare = _primary("疾风迅雷", 5, "疾风迅雷，汉语成语，形容事情的发生和发展像暴风急雷那样猛烈而迅速。")
+    bare.sections = [["释义", "形容事情的发生和发展。"]]
+    _write(tmp_path / "p.jsonl", [old, bare])
+    _write(tmp_path / "o.jsonl", [new, _overlay("疾风迅雷", 6, "疾风迅雷，汉语成语，形容事情的发生和发展像暴风急雷那样猛烈而迅速，出自《礼记》。")])
+    merge(str(tmp_path / "p.jsonl"), str(tmp_path / "o.jsonl"), str(tmp_path / "m.jsonl"))
+    by = {r["title"]: r for r in iter_records(str(tmp_path / "m.jsonl"))}
+    assert by["旁门左道"]["source"] == "563w+hf"
+    # the snapshot's section where it has one, the 2019 one where it has none, in the order they are shown in
+    assert by["旁门左道"]["sections"] == [["释义", "指非正统的学术流派或宗教派别。"], ["出处", "明·许仲琳《封神演义》"],
+                                      ["用法", "联合式；作宾语、定语；含贬义。"], ["反义词", "不二法门"]]
+    assert by["疾风迅雷"]["source"] == "563w+hf" and by["疾风迅雷"]["sections"] == [["释义", "形容事情的发生和发展。"]]

@@ -9,11 +9,12 @@ import sys
 import time
 from typing import Iterator, NamedTuple
 
-from .cleaning import (MIN_SUMMARY_CHARS, clean_text, clean_title, continues_on_next_line, definition_value,
-                       first_paragraph, has_tone_marks, is_summary_candidate, join_lines, pinyin_line_value,
+from .cleaning import (MIN_SUMMARY_CHARS, clean_text, clean_title, continues_on_next_line, decode_entities,
+                       definition_value, first_paragraph, has_tone_marks, is_summary_candidate, join_lines, pinyin_line_value,
                        says_nothing, short_summary_keep_reason, summary_drop_reason, title_drop_reason, trim_summary)
 from .readings import stated_pinyins
 from .records import Record, RecordWriter, loads
+from .sections import pick_sections, strip_pasted_furniture
 from .sense import is_descriptor
 
 SOURCE = "563w"
@@ -40,7 +41,8 @@ def iter_paragraphs(sections: list, title: str | None = None) -> Iterator[tuple[
     join never changes which paragraph is chosen. Joining short fragments as
     well turned stubs such as (2) 〔嗫～〕见“ / (3) 嗫”。 into summaries."""
     for sec in sections or []:
-        lines = [p for p in (clean_text(x, title) for x in _PARA_SPLIT_RE.split(sec.get("content") or "")) if p]
+        content = strip_pasted_furniture(sec.get("content"))
+        lines = [p for p in (clean_text(x, title) for x in _PARA_SPLIT_RE.split(content)) if p]
         i = 0
         while i < len(lines):
             para, used = lines[i], 1
@@ -178,6 +180,41 @@ def reads_title(title: str, row: list) -> bool:
         return False
 
 
+SECTION_PROOF_WITHIN = 3    # see sections.pick_sections
+
+
+def own_sections(sections: list) -> list[tuple[str | None, str | None]]:
+    """(heading, content) of the page's sections up to the first heading that
+    the page has had before: 简介 a second time is where the next article of
+    the row begins (智能鞋套机, followed by the 成语 祸福由人)."""
+    out, seen = [], set()
+    for sec in sections or []:
+        heading = (sec.get("title") or "").strip()
+        if heading and heading in seen:
+            break
+        seen.add(heading)
+        out.append((sec.get("title"), sec.get("content")))
+    return out
+
+
+def decode_row(raw: dict, stats: collections.Counter | None = None) -> dict:
+    """The row with the HTML entities of its title, summary and sections as
+    characters (cleaning.decode_entities). The row itself is left as it is."""
+    sections = raw.get("sections") or []
+    texts = [raw.get("title"), raw.get("summary")]
+    texts += [s.get(key) for s in sections for key in ("title", "content")]
+    if not any(isinstance(t, str) and "&" in t for t in texts):
+        return raw
+    out = dict(raw, title=decode_entities(raw.get("title")), summary=decode_entities(raw.get("summary"), cut_off=True))
+    out["sections"] = [dict(s, title=decode_entities(s.get("title")),
+                            content=decode_entities(s.get("content"), cut_off=True)) for s in sections]
+    changed = out["title"] != raw.get("title") or out["summary"] != raw.get("summary") or any(
+        a.get(key) != b.get(key) for a, b in zip(out["sections"], sections) for key in ("title", "content"))
+    if stats is not None and changed:
+        stats["rows_with_entities_decoded"] += 1
+    return out
+
+
 def detect_layout(path: str) -> str:
     """'jsonl' or 'array', decided from the first non-whitespace byte."""
     with open(path, "rb") as f:
@@ -200,8 +237,9 @@ def iter_raw(path: str) -> Iterator[dict]:
 
 
 def convert(raw: dict, stats: collections.Counter, max_summary_chars: int,
-            want_infobox: bool) -> Record | None:
+            want_infobox: bool, want_sections: bool = True) -> Record | None:
     """Turn one raw 563w object into a Record, or None (drop; reason counted)."""
+    raw = decode_row(raw, stats)
     title = clean_title(raw.get("title"))
     reason = title_drop_reason(title)
     if reason:
@@ -236,7 +274,7 @@ def convert(raw: dict, stats: collections.Counter, max_summary_chars: int,
         else:
             summary, reason = use(found), None
     else:
-        summary = clean_text(summary_src, title)
+        summary = clean_text(strip_pasted_furniture(summary_src), title)
         value = definition_value(summary)
         if value is not None and len(value) >= MIN_SUMMARY_CHARS:
             summary = value                           # "【解释】：指水止不流…" without its label
@@ -295,6 +333,12 @@ def convert(raw: dict, stats: collections.Counter, max_summary_chars: int,
             stats["flag:pinyin_line_kept"] += 1
     for f in flags:
         stats["flag:" + f] += 1
+    word_sections = None
+    if want_sections and sections:
+        word_sections = pick_sections(own_sections(sections), title, summary, proof_within=SECTION_PROOF_WITHIN)
+        for label, _text in word_sections or []:
+            stats["section:" + label] += 1
+        stats["records_with_sections"] += bool(word_sections)
     return Record(
         source=SOURCE,
         title=title,
@@ -308,12 +352,13 @@ def convert(raw: dict, stats: collections.Counter, max_summary_chars: int,
         snapshot_date=None,
         quality_flags=flags,
         infobox=infobox,
+        sections=word_sections,
     )
 
 
 def extract(path: str, out_path: str, limit: int | None = None,
             max_summary_chars: int = 300, want_infobox: bool = True,
-            progress_every: int = 200_000) -> collections.Counter:
+            progress_every: int = 200_000, want_sections: bool = True) -> collections.Counter:
     stats: collections.Counter = collections.Counter()
     stats["layout:" + detect_layout(path)] += 1
     seen_ids: set[int] = set()
@@ -328,7 +373,7 @@ def extract(path: str, out_path: str, limit: int | None = None,
             if lemma_id is not None and lemma_id in seen_ids:
                 stats["drop:dup_lemma_id"] += 1
                 continue
-            rec = convert(raw, stats, max_summary_chars, want_infobox)
+            rec = convert(raw, stats, max_summary_chars, want_infobox, want_sections)
             if rec is None:
                 continue  # the id stays free: a later row for it may be usable
             if lemma_id is not None:
