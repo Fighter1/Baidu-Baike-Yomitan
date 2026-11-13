@@ -223,6 +223,36 @@ dropped. A caption glued into a sentence is cut from the article title onwards
 caption would start, the text is left alone (`四种花色（52张）`). A UI label that
 is part of the article's own title (语音编辑器) is not removed.
 
+A bracket that holds nothing any more goes with what emptied it. Removing
+the citation marks left `（基本信息栏参考资料：）` under 960 summaries, 731 of
+them of CC-CEDICT headwords (争, 事, 喜); and the corpus lost names in other
+scripts, which left `帕勒马希姆（希伯来语：）`, `延森（，1873-1950）` and
+`安东尼·沃尔（Anthony David Wall，）`.
+
+- A bracket with only a reference label, or only the label of a name or a
+  language, is removed. Beside something else only the label goes:
+  `（俄语：Жердевка，英语：）` keeps the Russian.
+- The same note with its source written out goes too: what a page says of
+  its own picture, info table or sources
+  (`（基本信息主要来源：《新华写字字典第2版》、汉典网）`,
+  `（概述图参考来源：中国自然标本馆）`, `（资料来源：中国植物物种信息）`).
+  681 summaries had one; for 30 it was the whole summary, and they now show
+  what the page says. `（来源：阿拉伯语 qahwa）`, where a word is from, and
+  `（信息资料管理系统）`, a name, stay.
+- A separator right after the opening bracket goes, and one right before the
+  closing bracket when it follows a letter or a digit. `（达吐，）西域术语` is
+  a word somebody put in brackets with its comma.
+- An empty bracket after a Chinese character goes where the sentence carries
+  on behind it (`刘言（），吉州庐陵人`, `桑吉省（）是…`). It stays where it is
+  a blank nobody filled in (`内设机构共计（）个`), a lost character inside a
+  word (`笔名（）介`), the blank of an exercise at the end of a line, or a
+  bracket on a page about brackets (`小括弧()、中括弧[]`).
+- `rindex（）` and `(1,)` are code and are left alone.
+
+1,545 summaries and 29 section texts changed by the hollow brackets alone,
+and 641 more summaries by a source note. 293 brackets with a separator at
+the end and 175 empty ones are left, most of them meant.
+
 Overlay links keep the characters that mean something in a URL encoded
 (`/item/C%23/195147`), so they still lead to the article.
 
@@ -342,17 +372,38 @@ same way as the entities, in the same first step.
 are taken out; a tag that broke a line leaves a space.
 
 - Only layout tags: `br`, `p`, `div`, `li`, `span`, `strong`, `em`, `font`,
-  `sup`, `sub`, `wbr`, `iframe`, `noinclude`, and `a` with an attribute.
-  `<a>`, `<b>`, `<i>` and `<u>` only as a pair, because `字母<u>` is a letter.
+  `sup`, `sub`, `wbr`, `iframe`, `noinclude`, `h1`–`h6`, `center`, `pre`,
+  the cells and rows of a table (`th`, `td`, `tr`), `a` and `img` with an
+  attribute (`<IMG>` alone is a tag somebody writes about), and comments
+  (`<!--end-->`).
+  `<a>`, `<b>`, `<i>` and `<u>` only as a pair, because `字母<u>` is a letter;
+  a closing one alone is still a tag (`有限责任公司</B>是…`), also where it
+  lost its `>` in front of a Chinese character (`Sydney Pollack</A编剧`).
+- A script that is fetched from somewhere (`<script … src=…></script>`) is
+  code of the page the text was copied from, an advertisement or a counter,
+  and goes. A script that is written out is what a text about scripts shows.
+- A tag that the corpus cut off with the end of a text goes
+  (`…而努力奋斗。<br`), but not `其中0<p`, the end of an inequality. Inside
+  a text, at the end of a line, only a closing tag or one with an attribute
+  (`<DIV id=… class=style=`).
+- `<p zdct3">` and `<p class="zdct8` are paragraphs of the dictionary site
+  汉典 whose quotes the corpus broke (碧澄澄, 曹司, 复室).
+- Nine tags broken in a way that occurs once, each in one article, are
+  mended by a table of the exact strings: `测<BR试` is `测试`,
+  `<a a.孔德` is `A.孔德`, `<A 电力电缆 a>` is `电力电缆`.
 - An attribute has to be `name=value`: `<A Year Without Rain>` is an album and
   `<li quan>` a reading. `<stdio.h>`, `<math>` and the like are text.
 - A text about markup keeps its tags (`以<li>开始</li>结束`). It is one when
   it says `HTML`, `超文本`, `超链接`, `控件` or `标识符`, or has tags of
-  another kind (`<body>`, `<ul>`, `<table>`, `<script>`); when `标签` stands
-  within 100 characters of a tag; or when `元素` or `字母` names a tag
-  (`<p> 元素`, `iframe元素`, `页面元素<div>`). `多种矿物元素` in a text about a
+  another kind (`<body>`, `<ul>`, `<table>`, `<script>`, `<form>`,
+  `<input>`); when it is code (`<?php`, `echo "…"`, `document.write(`,
+  CSS's `伪元素`); when `标签` stands within 100 characters of a tag; when a
+  tag is called a `标记` or shown as `代码：`; or when `元素` or `字母` names
+  a tag (`<p> 元素`, `iframe元素`, `页面元素<div>`). `html` in the name of a
+  file (`robot.html`) does not count. `多种矿物元素` in a text about a
   village does not make it one, nor does a food label 1,900 characters after
-  a stray `</a>`.
+  a stray `</a>`, nor `Ni元素` in a text about steel: a chemical symbol names
+  a tag only where the text has a tag of that name.
 - Titles are left alone.
 
 **Private-use characters.** A character from U+E000 to U+F8FF means something
@@ -379,9 +430,16 @@ character.
 
 311 texts had a layout tag, and 274 body texts and 22 titles a private-use
 character. No body text has one now; five titles keep one inside them. Of
-the layout tags, 11 body texts keep theirs: 10 are about markup and one is
-pasted advertising code. Another 7 unpaired or broken ones (`</B>`,
-`<p zdct3">`) are not read as tags and stay.
+the layout tags, 16 body texts keep theirs, all of them about markup.
+Pictures, headings and comments were in about 140 more summaries (114 of
+them a comment such as `<!--end-->`), and some fifteen entries showed a
+fetched script, a table cell or a broken tag; 27 records whose summary was
+little else are no longer entries. What is left in angle brackets is a
+formula, a title or a reading (`0<p<1`, `<A Better Day>`, `<bì>`).
+
+In text that is not shown the guard is not always right: a teaching text
+whose only sign of code is a fetched script or a file name loses its tags
+(jquery, IzPack), and a phone page that lists `HTML5` keeps a pasted `<p>`.
 
 ### Sections of pages about words
 
@@ -495,10 +553,10 @@ are the pronunciation sections: the reading field has that.
   page (`--------`) is dropped, and a list of 成语 written without anything
   between them is split every four characters.
 
-121,077 records carry sections (90,200 of the 2019 corpus, 44,608 of the
-overlay before the merge). After leaving out what the summary says, 76,396
-senses of the full dictionary (1.6%) and 29,040 of the lexical one (28%) show
-some: 释义 43,948, 出处 26,572, 详解 16,460, 示例 13,320, 用法 5,106, 近义词
+121,071 records carry sections (90,197 of the 2019 corpus, 44,597 of the
+overlay before the merge). After leaving out what the summary says, 76,387
+senses of the full dictionary (1.6%) and 29,035 of the lexical one (28%) show
+some: 释义 43,941, 出处 26,570, 详解 16,455, 示例 13,319, 用法 5,106, 近义词
 4,654, 反义词 2,673, 辨析 1,143. The full zip grows by 20 MB (1.4%), the
 lexical one from 28 MB to 36 MB.
 
@@ -538,7 +596,7 @@ that the other one has, with the title itself left out.
 | decision | when | example |
 |---|---|---|
 | refresh, `same_text` | the most similar overlay sense shares at least 25% | 时间 against its 物理量 sense: 0.45 |
-| refresh, `likely_same` | it shares at least 10%, no other sense comes within half of that, and both are the same kind (not a word against a song). Two biographies must also name the same year | 北京 2019 against 2022: 0.16, the song 0.00 |
+| refresh, `likely_same` | it shares at least 10%, no other sense comes within half of that, and both are the same kind (not a word against a song, and not an article against somebody in a film, game or novel that it does not mention: 鬼谷子 the thinker against a figure of 《秦时明月》 named after him, 0.20). Two biographies must also name the same year | 北京 2019 against 2022: 0.16, the song 0.00 |
 | refresh, `weak_primary` | nothing reads alike, but the 2019 text is only a fallback paragraph or a stub, and the overlay has one clear candidate (the sense the id-less URL showed, or the only one that is not a work) that is not a person and does not say much less | 说明: `【英译】[Explain;…]` gives way to the 汉语词汇 sense |
 | keep the 2019 record | otherwise | 大学 keeps its article; the documentary film 《大学》 becomes a sense of its own |
 

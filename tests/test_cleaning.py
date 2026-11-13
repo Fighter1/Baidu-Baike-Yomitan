@@ -7,6 +7,34 @@ def test_strip_citation_markers():
     assert strip_citations("修订［12］法") == "修订法"
 
 
+def test_brackets_that_hold_nothing_any_more():
+    # a note on where the page has its info table or its picture from, once the citation marks are gone
+    assert clean_text("又引申为竞争。（基本信息栏主要参考资料：[3] ）") == "又引申为竞争。"
+    assert clean_text("狮子搏兔 （词语参考资料[8] [9] ）") == "狮子搏兔"
+    assert clean_text("（参考资料：[7-8]  [9] [10-11]  ）") == ""
+    assert clean_text("教参（教学参考资料）是教师用书") == "教参（教学参考资料）是教师用书"
+    # the same note with its source in words, and what a page says of a picture the dictionary has not got
+    assert clean_text("祛风之效。（概述图参考来源：中国自然标本馆[2] ）") == "祛风之效。"
+    assert clean_text("又引申为时间上的一个完整循环。（基本信息主要来源：《新华写字字典第2版》、汉典网）") == "又引申为时间上的一个完整循环。"
+    assert clean_text("云南有引种。（资料来源：中国植物物种信息）") == "云南有引种。"
+    assert clean_text("演绎剧情。（概述图人物：乔瓦尼·巴蒂斯塔·佩尔戈莱西）") == "演绎剧情。"
+    assert clean_text("（参考资料：六安政府网、中国文明网等）") == ""
+    for text in ("咖啡（来源：阿拉伯语qahwa）是一种饮料", "该系统（信息资料管理系统）已投入使用", "数据（来自2010年人口普查）显示"):
+        assert clean_text(text) == text
+    # a name in a script that the corpus lost
+    assert clean_text("帕勒马希姆（希伯来语：）以色列的一个集体公社") == "帕勒马希姆以色列的一个集体公社"
+    assert clean_text("热尔杰夫卡（俄语：Жердевка，英语：），城市名") == "热尔杰夫卡（俄语：Жердевка），城市名"
+    assert clean_text("格尔利茨（德语：，波兰语：，索布语：，捷克语：）是德国的城市") == "格尔利茨是德国的城市"
+    assert clean_text("约翰尼斯·延森（，1873-1950）丹麦小说家") == "约翰尼斯·延森（1873-1950）丹麦小说家"
+    assert clean_text("安东尼·沃尔（Anthony David Wall，）英国高尔夫球运动员") == "安东尼·沃尔（Anthony David Wall）英国高尔夫球运动员"
+    assert clean_text("刘言（），吉州庐陵人。桑吉省（）是布基纳法索的一个省") == "刘言，吉州庐陵人。桑吉省是布基纳法索的一个省"
+    for text in ("内设机构共计（）个，人员编制20名", "笔名（）介、余川等", "有小括弧()、中括弧[]、大括弧三种", "原文中有明显错误者加圆括符（），",
+                 "rindex（）用来找出参数s字符串中最后一个出现的地址", "t = (1,) 是一个元组", "须将点的地球坐标（，λ）换算成球面坐标",
+                 "孔子说：“（虽然是简陋的地方，但只要君子在这里居住，）又有什么简陋的呢", "专辑《我(不：)是张卫健》", "顿号（、）表示并列",
+                 "（四至范围：）东至左堤"):
+        assert clean_text(text) == text
+
+
 def test_clean_text_full_pass():
     s = "“一盔一带”安全守护行动指的是公安部…行动。[1-2]\xa02020年5月20日，公安部要求。[3]　编辑播报 zhua曲子白渡白颗"
     assert clean_text(s) == "“一盔一带”安全守护行动指的是公安部…行动。2020年5月20日，公安部要求。"

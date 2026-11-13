@@ -163,3 +163,50 @@
 后孙家鲍村	any	耕地1241 亩	full
 继发性肾病	summary_lacks	</a>	full
 li标签	any	以<li>开始</li>结束	full
+
+# -- A bracket that holds nothing any more goes: the note on where a page has its info table from, once the
+#    citation marks in it are removed (争 ended （基本信息栏主要参考资料：）, 卯 had a 详解 that was only
+#    （参考资料：）), and the place of a name the corpus lost (帕勒马希姆（希伯来语：）, 延森（，1873-1950）).
+#    A blank nobody filled in stays, and so do the brackets on a page about brackets.
+争	summary_lacks	参考资料：）
+卯	section_lacks	参考资料
+白腰杓鹬	summary_lacks	（学名：）
+帕勒马希姆	summary_lacks	（希伯来语：）	full
+桑吉省	any	桑吉省是布基纳法索	full
+延森	any	（1873-1950）	full
+蜈蚣草	any	（学名：Pteris vittata L.）	full
+武城县委党校	any	共计（）个	full
+圆括号	section_has	形式为()
+
+# -- Pictures, headings and comments of a page, and the paragraph marks of 汉典 with their quotes broken
+#    (碧澄澄 had 一片晴空。”<p zdct3">(2).形容深蓝而阴森 in its 释义)
+毛叶枣炭疽病	summary_lacks	<img	full
+伯特绦虫病	summary_lacks	<h1>	full
+学绣塔	summary_lacks	<!--	full
+碧澄澄	section_lacks	zdct	full
+碧澄澄	section_has	形容深蓝而阴森	full
+曹司	section_lacks	zdct	full
+曹司	section_has	吏目	full
+
+# -- A page's note on where its picture, its info table or its text is from goes, also with the source in
+#    words (旬 ended （基本信息主要来源：《新华写字字典第2版》、汉典网）). Where the note was the whole summary,
+#    the entry shows what the page says (厚穗狗尾草 was （资料来源：中国植物物种信息）).
+旬	summary_lacks	基本信息主要来源
+霸王鞭	summary_lacks	概述图
+喜歌剧	summary_lacks	概述图人物	full
+厚穗狗尾草	any	生于海边砂地	full
+
+# -- A script fetched from elsewhere, table cells, a closing tag without its >, and tags broken in one article
+#    each. A tag that the text calls a 标记 stays.
+泰国陆军L119式105毫米轻型火炮	summary_lacks	<script	full
+D381	summary_lacks	<th>	full
+往日情怀	summary_lacks	</A	full
+实证哲学教程	any	社会学家A.孔德的代表作	full
+核磁共振实验200例：实用教程	any	碳核测试到多种核素测试	full
+insertRow	any	<tr> 标记	full
+
+# -- The 2019 article is not replaced by somebody in a work who has its name (鬼谷子 the thinker by a figure of
+#    《秦时明月》, 天帝 the god by a class in 《地下城与勇士》, 圣主 the word by a villain of 《成龙历险记》)
+鬼谷子	any	历史上极富神秘色彩的传奇人物	full
+天帝	any	神话传说中天上的主神
+圣主	any	对当代皇帝的尊称	full

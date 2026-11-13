@@ -1,14 +1,14 @@
 {
- "entries": 167377,
- "entries_traditional": 62720,
+ "entries": 167395,
+ "entries_traditional": 62725,
  "kept:excluded_tag_on_ordinary_word": 1663,
- "reading:cedict": 104657,
- "records_seen": 4877405,
- "seconds": 122,
- "senses_with_sections": 29040,
+ "reading:cedict": 104670,
+ "records_seen": 4877477,
+ "seconds": 70,
+ "senses_with_sections": 29035,
  "skip:excluded_tag": 2167,
- "skip:not_in_cedict": 4770581,
+ "skip:not_in_cedict": 4770640,
  "term_banks": 17,
- "titles_with_multiple_senses": 46905,
- "zip_bytes": 36424312
+ "titles_with_multiple_senses": 46995,
+ "zip_bytes": 36396382
 }

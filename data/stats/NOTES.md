@@ -860,3 +860,331 @@ says `HTML` about something else keeps its tags (广州市诚毅科技软件开�
 in a section that is not shown), and so do `H13钢` and five pages with the
 same text (`合金元素…<sup>[14]</sup>`, not shown either; why was not looked
 into); the 7 unpaired or broken tags.
+
+## Fifth local build, 2026-11-12: hollow brackets, the other tags, chemical symbols
+
+The list above, taken up item by item. Counting each item first changed
+what the work was: two of them were far larger than the list said.
+
+**Brackets that hold nothing.** The two empty brackets where a `<noinclude>`
+stood were the smallest case of something common. On the records of the
+build above, by what the bracket still held:
+
+| what is left in the bracket | summaries | sections | under a CC-CEDICT headword |
+|---|---:|---:|---:|
+| only a reference label: `（基本信息栏参考资料：）` | 960 | 23 | 754 |
+| a separator at the end: `（Anthony David Wall，）` | 515 | 21 | 37 |
+| nothing, after a Chinese character: `达尼埃莱·帕波尼（），男` | 268 | 5 | 10 |
+| only another label: `（希伯来语：）`, `（学名：）` | 83 | 2 | 8 |
+| a separator at the start: `延森（，1873-1950）` | 43 | 0 | 0 |
+| nothing, after a function name: `rindex（）` | 662 | 6 | 0 |
+
+The raw rows show two causes. The reference labels are ours: the snapshot
+has `（基本信息栏主要参考资料：[3] ）`, the citation rule takes the `[3]`,
+and the label stays behind, under the summary of 731 CC-CEDICT headwords,
+most of them single characters (争, 事, 喜). Everything else is hollow in the
+corpus already, in both sources: a name in Korean, Hebrew or Japanese
+script that the corpus lost (`谚文日（朝鲜语：）`, `小林一茶（，こばやし…）`).
+
+The rule, in `clean_text` right after the citation marks go:
+
+- A bracket holding only a reference label goes. With a colon any label that
+  says 参考, 来源, 来自 or 资料; without one only what a page says of itself
+  (`（参考资料）`, `（以上参考资料）`): `（教学参考资料）` is a kind of book.
+- A bracket holding only the label of a name or a language goes
+  (`学名`, `英文`, `…语`, `…文`, `简称` …); where other things stand beside
+  it, only the label goes: `（俄语：Жердевка，英语：）` keeps the Russian.
+- A separator right after the opening bracket goes when at least three
+  characters follow (`地球坐标（，λ）` lost a letter, not a name). One right
+  before the closing bracket goes after a letter, a digit or a full stop
+  that is not Chinese: `（达吐，）西域术语` and `（虽然是简陋的地方，…，）又有…`
+  are words somebody put in brackets with their comma.
+- An empty bracket goes after a Chinese character when punctuation or one
+  of `是即为的和与及被于又也成创位坐座在` follows. Read one by one, many of
+  the 268 were something else, and the rule takes 97 of them:
+  `内设机构共计（）个`, a blank nobody filled in (pages of county
+  offices); `笔名（）介`,
+  `下山（）林场`, a character the corpus lost inside a word; an exercise
+  (`正确的一项是（）` at the end of a line); and pages that show brackets
+  (`小括弧()、中括弧[]`, `加圆括符（），`). Those stay: no removal on a
+  page that says 括号, 括弧, 括符, 全角, 半角, 符号 or 标点.
+- An ASCII bracket with only ASCII inside is left alone: `(1,)` is a tuple.
+
+A note that still names its source stays: 503 summaries end with one
+(`（基本信息主要来源：《新华写字字典第2版》、汉典网）`,
+`（概述图参考来源：中国自然标本馆）`).
+
+**Tags.** "7 unpaired or broken" was an undercount: the pattern that counted
+them stopped at 60 characters and at Chinese, so it missed the long ones. A
+wider one found about 55 entries with a tag that was shown: 29 summaries
+with an `<img …>`, a dozen with a heading, `<CENTER>`, `<pre>` or a comment,
+15 cut off or glued to the text. Running the rule over the raw rows found
+the most common kind only then: comments, `<!--end-->` and the like in 114
+summaries, most of them of officials and regulations.
+
+- Added to the tags that are taken out: `h1`–`h6`, `center`, `pre`, `img`
+  with an attribute (`<IMG>` alone is a tag somebody writes about), and
+  comments, also one that the text ends in.
+- A quoted attribute value may hold a `>`:
+  `onload="if(this.width>screen.width-500)…"` left half a tag behind.
+- A closing `</a>`, `</b>`, `</i>`, `</u>` without its opening tag goes
+  (`有限责任公司</B>是…`). An opening one alone stays: `字素<a>`.
+- A tag the corpus cut off with the end of a text goes (`…而努力奋斗。<br`,
+  `《<a target=_blank`), not after a letter or a digit (`其中0<p`). The first
+  version let the cut-off tag run to the end of the text whatever stood in
+  between and took the second half of 曹司's 释义 with it; a unit test
+  caught it. No sentence mark may stand inside.
+- `<p zdct3">` and `<p class="zdct8`: paragraphs of 汉典 with their quotes
+  broken, in the 释义 of 碧澄澄, 曹司 and 复室.
+
+**The guard.** `H13钢` kept its `<sup>` because of `Ni元素`: the rule read
+any Latin name in front of `元素` as the name of a tag. Of the 422 raw texts
+that keep their tags, 30 do so for this reason alone, and 9 of those are
+wrong: seven pages with the steel text (not six, as the note above has it),
+酸 (`H、O元素`) and one where `cabaret元素` is a kind of music. A chemical
+symbol now counts only where the text has a tag of that name (`P元素`
+beside a `<p>`). Run again over the raw rows, the steel pages and 酸 lose
+their tags; the music page stays as it is.
+
+Old against new:
+
+- Raw 2019 rows with a layout tag, both trees: 3,877 rows, 192 records
+  differ (151 summaries, 10 info tables, 7 section texts). 26 records are
+  no longer entries: 19 whose summary was a picture or a tag and at most
+  the title (`川菜翠`, `步步高3680`), and 7 that had only passed a rule
+  because of a comment (`雿 <!--编辑词条创建词条-->`, `中共义乌市委常委、
+  副市长<!--end-->`, a `简历：…` line behind `<!--begin-->`).
+- All 587,819 overlay rows: 2,098 summaries and 61 section sets differ, no
+  record is lost. 19 section labels go: a 详解 that was only
+  `（参考资料：）` (卯, 辰, 百, 白, 有, 鱼) and a 释义 that was only
+  `康熙字典笔画( 蝥:15；)`.
+- The bracket rule over the body texts of the build above: 1,562 summaries
+  and 47 section texts change; every group was read.
+
+The build against the one above:
+
+| | before | now |
+|---|---:|---:|
+| brackets with only a reference label | 983 | 4 |
+| brackets with a separator at the end | 536 | 293 |
+| empty brackets after a Chinese character | 273 | 175 |
+| brackets with only another label | 85 | 39 |
+| brackets with a separator at the start | 43 | 4 |
+| body texts with a layout tag | 11 | 13 |
+| headwords, full | 4,799,711 | 4,799,686 |
+| senses, full | 4,877,405 | 4,877,378 |
+| senses showing sections, full | 76,396 | 76,386 |
+| headwords, lexical | 82,060 | 82,060 |
+| senses, lexical | 104,657 | 104,656 |
+| senses showing sections, lexical | 29,040 | 29,032 |
+| zip bytes, full | 1,432,224,070 | 1,432,179,579 |
+| zip bytes, lexical | 36,424,312 | 36,406,221 |
+
+Shown labels: 释义 43,948 to 43,941, 详解 16,460 to 16,453, 出处 and 示例
+one less each; records with sections 121,077 to 121,068.
+
+Record by record: 1,545 summaries changed by a hollow bracket alone (861
+under a CC-CEDICT headword), 141 otherwise (tags and comments; one is 奇,
+below), 39 section texts (29 by a hollow bracket alone), 14 section labels
+gone, 23 info tables (a value
+is cleaned the same way: `高贤贞()`, `（Hary，）`). The 13 texts that keep
+a layout tag are the 11 from before and two that the wider list of tags
+now sees, both about markup (`alt标签`, `for each元素`).
+
+37 records went and 10 came. 26 are the tag-only entries above. The other
+11 and the 10 are a side effect on the merge: the hollow bracket had been
+part of the text that the 2019 record and the snapshot are compared by.
+
+- `事` and `匿`: the 2019 stubs (`事，中国汉字，主要阐述…`,
+  `匿，音读ni…基本意义有隐藏`) shared the word `基本` with
+  `（基本信息栏来源：）` and with nothing else in the snapshot. Score 0.100
+  and 0.133 with the bracket, 0.050 and 0.067 without; the line is 0.10. They
+  are two senses now, the snapshot first.
+- `奇`: its snapshot now has under 60% of the Chinese characters of the
+  weak 2019 text it used to replace; the characters of the bracket had
+  counted.
+- `保`, `培`, `婢`: the other way round. Without the bracket they score
+  0.103, 0.107 and 0.100. One sense where there were two.
+- `潘婕`: the 2019 record of an actress is no longer overwritten with the
+  summary of an e-sports manager.
+- `诸葛亮`, `尼古拉斯`: one of two game sprites with almost the same line
+  now counts as a repeat of the other.
+
+A single character whose 2019 record stands beside an unmerged snapshot
+labelled 汉语汉字 is nothing new: 1,023 in the build above, 1,021 now.
+
+The 4 reference labels left are of other kinds (`（图片链接：）`,
+`（从本科开始填写，时间应连续，参考样式如下：）`). On the raw 2019 texts
+the wider list finds 4,412 with a layout tag (3,073 before); 559 keep
+theirs.
+
+Golden words: 115 of 115 (full) and 68 of 68 (lexical), 16 lines added.
+193 tests. Senses without a reading 148,219, summaries cut inside a quote
+8,156.
+
+**Not fixed**: the 1,021 characters just named, which a rule for pages of
+single characters in the merge would settle; a hollow bracket in ASCII with
+only ASCII inside (`崔健吾(,1913 - 1941)`); an empty bracket in front of any
+other character (`从头甲基化 表观遗传学（）中的`), 175 texts with the blanks
+and the lost characters; a separator at the end of a bracket after a
+Chinese character, 293 texts, most of them meant; the 503 notes that name a
+source. Tags: pasted advertising code that opens with `<script …>` (泰国陆军
+L119式105毫米轻型火炮, 红罗宾石楠, and 环法车赛 as before), because
+`<script` is what marks a text about markup; table tags (`<th>` in D381 and
+白昆弘), which pages about HTML name with `标记`; an opening `<b>` or `<a>`
+alone; and about ten one-off breakages (`</A编剧`, `<a a.孔德`,
+`<A 电力电缆 a>`, `<font span="" 案发于…`, `of<sup<sup<sup cl`,
+`<IMG class=tex alt="1 < p`). Left as they were on purpose, neither on any
+record: code samples whose only word about markup is `元素` for an array
+or DOM element lose their tags (`POS()`, `CSS伪元素`), and a text that says
+`HTML` of something else keeps them (41 raw texts are kept by that word
+alone, a handful of them not about markup going by their titles).
+
+## Sixth local build, 2026-11-12: source notes, the last tags, code, a borrowed name
+
+What the section above left, item by item.
+
+**Notes that name a source.** `（基本信息主要来源：《新华写字字典第2版》、
+汉典网）` under 旬 is the same note as `（基本信息栏参考资料：[3]）` under 争,
+which went with its citation mark; the only difference is that the source
+is written out. A bracket that opens with what a page calls its own
+picture, info table or sources now goes whole: `概述图…` (anything about
+the picture, also `（概述图人物：乔瓦尼·巴蒂斯塔·佩尔戈莱西）`, which
+means nothing without the picture), and `基本信息栏`, `信息栏`, `名片`,
+`图片`, `参考`, `资料`, `数据` followed by `参考`, `来源`, `来自`, `资料` or
+`链接` and a colon. The colon is required: `（信息资料管理系统）` is a
+name. `（来源：阿拉伯语 qahwa）` is where a word is from and stays.
+
+On the records of the build above the rule takes 681 notes out of
+summaries (663 at the end of one) and 3 out of info tables. The labels,
+read in full: 基本信息主要来源 136, 概述图参考来源 78, 概述图片来源 72,
+基本信息栏参考资料 67, 概述内图片来源 67, 概述图来源 57, 资料来源 47 and
+a tail of single ones, all of this kind. For 30 summaries the note was
+all there was, most of them plants with `（资料来源：中国植物物种信息）`;
+they now show what the page says (厚穗狗尾草: `产我国台湾；生于海边砂地`).
+All 587,819 overlay rows, old code against new: 1,224 summaries differ,
+no record is lost. Three notes are left (`名片…`, `信息提供：`).
+
+**The tags that were still shown.** One by one from the list above:
+
+- A script that is fetched from somewhere (`<script … src=…>`) is page
+  code, an advertisement or a counter, and is taken out like a layout tag:
+  泰国陆军L119式105毫米轻型火炮, 红罗宾石楠, 环法车赛. It no longer marks a
+  text as being about markup; a script that is written out still does.
+- `th`, `td`, `tr`, `thead`, `tbody` are layout tags (D381, 白昆弘). So that
+  pages about them keep theirs, a tag followed by `标记` names itself
+  (insertRow: `一个新的 <tr> 标记`).
+- A closing tag that lost its `>` in front of a Chinese character
+  (往日情怀: `Sydney Pollack</A编剧`).
+- A tag cut off with its line, not only with the text, when it is a closing
+  tag or has an attribute (北京长光光纤通信网络设备有限公司:
+  `<DIV id=… class=style=`). Not a bare `<P` at the end of a line: the first
+  version took `于是<P` out of a formula (BCH码), found in the comparison of
+  raw texts.
+- Nine breakages that occur once are mended by a table of the exact
+  strings, as the damaged entity names are: `测<BR试`, `<a a.孔德`,
+  `<A 电力电缆 a>`, `<IMG class=tex alt="1 < p` (the formula is what the
+  picture says), `<font span="" 案发于一体`, `<B制作以传统工艺`,
+  `人大附中<a>西山学校`, `<b>　　《现场安全员岗位通》`, and
+  `of<sup<sup<sup cl`, which is all there is of 102715 and no entry any
+  more. The table's first version had a plain space where the page has
+  two full-width ones; the comparison of builds showed the entry unchanged.
+
+Raw 2019 rows with a layout tag, both trees: 3,972 rows, 7 records differ,
+each in its summary. The build has no tag left that is shown as one: 16
+body texts keep a layout tag and all are about markup (the 13 from
+before without 环法车赛, and appendchild, tbody, nowrap, insertRow, whose
+`<td>` and `<tr>` are layout tags now). What else has the shape of a tag
+is a formula, a title or a reading (`0<p<1`, `<A Better Day>`, `<bì>`).
+
+**The guard, on text that is not shown.** Decisions over the raw 2019
+texts, old against new: 146 texts that lost their tags keep them now and
+74 that kept them lose them.
+
+- Kept now: code. `<?php`, `<?xml`, `echo "…"`, `<form>`, `<input>`,
+  `<map>`, `<area>`, `document.write(`, `getElement…`, `伪元素`, a tag
+  called a `标记`, `代码：` in front of a tag. Nearly all of the 146 are
+  PHP function pages whose example ends in `echo "<br />"`; the note above
+  knew of a handful. Among them are a few pages with pasted page code
+  (明基S830 has an `<input>`), which keep a `<br>` nobody sees.
+- Lost now: 53 with table cells, the fetched scripts, and `html` in the
+  name of a file, which no longer counts (`club.qq.com/moo.shtml`,
+  `robot.html`): 67 texts were kept by the word `html` alone, 44 are.
+- Not rescued: a teaching text whose only sign of code is a fetched script
+  or a file name (jquery, isinteger, IzPack, 锚点), a text that is nothing
+  but one tag (`<td colspan="value">` on the page colspan), a table written
+  as `< /TD >` with spaces. `HTML5` in the list of what a phone supports
+  still keeps a text's tags (安卓手机, 广州市诚毅科技软件开发有限公司).
+
+**A borrowed name in the merge.** Comparing the build with the one above
+showed 鬼谷子 the thinker replaced by `鬼谷子，是中国3D武侠动画《秦时明月》
+系列中，根据…思想家鬼谷子衍生出的剧情设定`. The figure's summary had
+ended in `（概述图及配音均指下文中的第3位…）`; without it the two texts
+share 0.200 instead of 0.156, the book 《鬼谷子》 stays at 0.086, and
+0.086 is now under half of the best score, which is what `likely_same`
+asks. The texts do read alike: the figure is named after the man.
+
+The merge now leaves the 2019 record alone when one of the two texts
+introduces the title as somebody or something in a work (`动画《…》…中…角色`,
+`游戏《…》中的精灵`, `小说《…》中人物`) and the other does not mention that
+work. Three things came from reading what it changed, in three runs of the
+merge alone (240, then 130, then 83 refreshes undone):
+
+- The work has to be followed by what the title is in it. `作品《史记》中
+  记载…` (九卿) and `在电影《梅兰芳》中出演…` are no such thing.
+- The first characters of the work's name are enough: 戴宗 of 《水浒传》
+  against `在水浒英雄榜上排在第二十位`.
+- A 2019 page whose tags say 游戏, 动漫, 漫画, 动画, 小说, 虚拟 or 角色 is
+  about somebody made up even where its summary names no work (耐普图隆).
+
+Of the 83, read one by one, about 60 were the same fault, and it is in the
+published release: 圣主 (an address for the emperor) under a villain of
+《成龙历险记》, 天帝 under a class of 《地下城与勇士》, 李四 and 黑瞎子 under
+characters, 湫 the character under a figure of 《大鱼海棠》, 宁克 an official
+under a figure of 《龙珠超》, 白雪姬 a plant, 盖聂, 戴涛. About 22 are the
+same figure twice, where the 2019 text names neither the work nor has such
+a tag (提里奥·弗丁, 包荣兴, 云天明, 阿尔温 of 《指环王》 against 《魔戒》).
+The module prefers showing an article twice to losing it.
+
+One consequence for the lexical dictionary: two headwords more. 诺特 is
+one of them: it was left out for its tag 人物; the game figure of that
+name, now a record of its own, has no tags, like every overlay record,
+and gets in. The other was not looked up.
+
+Other flips from the notes going, as in the section above: 宏 and 逸 now
+have the 2019 text as a second sense, 组曲 and 尚松 one sense less, 罗隐 is
+refreshed from his own later page. Single characters with an unmerged
+snapshot: 1,024.
+
+The build against the one above:
+
+| | before | now |
+|---|---:|---:|
+| notes that name a source, summaries | 681 | 3 |
+| body texts with a layout tag | 13 | 16 |
+| entries that show part of a tag | about 15 | 0 |
+| headwords, full | 4,799,686 | 4,799,684 |
+| senses, full | 4,877,378 | 4,877,477 |
+| headwords with several senses, full | 46,904 | 46,995 |
+| senses showing sections, full | 76,386 | 76,387 |
+| headwords, lexical | 82,060 | 82,062 |
+| senses, lexical | 104,656 | 104,670 |
+| senses showing sections, lexical | 29,032 | 29,035 |
+| zip bytes, full | 1,432,179,579 | 1,432,181,191 |
+| zip bytes, lexical | 36,406,221 | 36,396,382 |
+
+Record by record: 641 summaries changed by a source note alone (307 under
+a CC-CEDICT headword), 133 otherwise (the 30 that were only a note, the
+tags, and the 83 of the merge), 3 info tables; 29 records went and 128
+came, all but 102715 and one plant through the merge.
+
+Golden words: 128 of 128 (full) and 71 of 71 (lexical), 13 lines added.
+193 tests. Senses without a reading 148,220, summaries cut inside a quote
+8,156.
+
+**Not fixed**: the about 22 figures shown twice; namesakes without tags in
+the lexical dictionary (诺特), which needs tags on overlay records or a
+filter by kind; the single characters with an unmerged snapshot; what the
+guard does not rescue, named above; and from the section above the hollow
+brackets that were left on purpose or could not be told apart (175 empty
+ones, 293 with a separator at the end, the ASCII ones).

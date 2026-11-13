@@ -146,6 +146,39 @@ def is_person(rec: dict, certain: bool = False) -> bool:
     return bool((_CERTAIN_PERSON_RE if certain else _PERSON_RE).search((rec.get("summary") or "")[:80]))
 
 
+# Somebody or something in a work, which is not the one it is named after: 鬼谷子，是中国3D武侠动画《秦时明月》
+# 系列中，根据…思想家鬼谷子衍生出的剧情设定; 诸葛亮是网页游戏《赛尔号》中的精灵.
+# The work has to be followed by what the title is in it: 作品《史记》中记载… and 在电影《梅兰芳》中出演… are
+# no such thing.
+_IN_A_WORK_RE = re.compile(r"(?:动画|动漫|漫画|游戏|网游|手游|小说|电影|影片|电视剧|剧集|美剧|日剧|韩剧|作品)"
+                           r"[^，,。；《》]{0,6}《(?P<work>[^》]{1,30})》[^。；《》]{0,12}(?:中|里)[^。]{0,40}?"
+                           r"(?:角色|人物|精灵|反派|主角|配角|主人公|英雄|职业|道具|怪物|称号|设定|技能|装备|宠物|武将|BOSS|NPC)")
+
+
+# Tags of a 2019 page about somebody who is made up. Its summary often does not name the work
+# (耐普图隆: 猎潮者耐普图隆是他所统治领域——深海的灵魂), and then the tags are all that says so.
+_FICTION_TAG_RE = re.compile("动漫|漫画|动画|游戏|小说|虚拟|角色")
+
+
+def work_it_is_in(rec: dict) -> str | None:
+    """The film, game, novel … that the summary introduces the title as a
+    character or a thing of, or None."""
+    m = _IN_A_WORK_RE.search((rec.get("summary") or "")[:100])
+    return m.group("work") if m else None
+
+
+def of_another_work(a: dict, b: dict) -> bool:
+    """One of the two is somebody in a work that the other does not speak of:
+    the thinker 鬼谷子 and the figure of 《秦时明月》, 天帝 the god and a class
+    in 《地下城与勇士》. Not 戴宗 of 《水浒传》 against 在水浒英雄榜上排在第二十位."""
+    for one, other in ((a, b), (b, a)):
+        work = work_it_is_in(one)
+        if (work and work[:2 if len(work) <= 3 else 3] not in (other.get("summary") or "")
+                and not any(_FICTION_TAG_RE.search(tag) for tag in other.get("tags") or [])):
+            return True
+    return False
+
+
 def share_a_year(a: dict, b: dict) -> bool:
     """Both summaries name the same year (of birth, mostly): the one cheap
     sign that two biographies under one name are the same person."""

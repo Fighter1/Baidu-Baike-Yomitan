@@ -38,7 +38,7 @@ import collections
 from .cleaning import MIN_SUMMARY_CHARS, SAME_ARTICLE, cjk_len, says_nothing, similarity
 from .records import RecordWriter, iter_records
 from .sections import ORDER
-from .sense import is_person, is_work, share_a_year
+from .sense import is_person, is_work, of_another_work, share_a_year
 
 _UNCLEAN = {"obfuscated", "abstract_fallback"}
 _WEAK = {"summary_from_section", "kept_short_sentence", "kept_alias_line"}
@@ -110,7 +110,9 @@ def pick_refresh_candidate(rec: dict, senses: list[dict]) -> tuple[dict | None, 
     if top >= SAME_TEXT:
         return best, "same_text"
     runner_up = scored[1][0] if len(scored) > 1 else 0.0
-    if top >= LIKELY_SAME and runner_up <= top / 2 and is_work(best) == is_work(rec):
+    # 鬼谷子 the thinker and the figure of an animation that is named after him read alike (0.20).
+    if (top >= LIKELY_SAME and runner_up <= top / 2 and is_work(best) == is_work(rec)
+            and not of_another_work(best, rec)):
         if not (is_person(best) or is_person(rec)) or share_a_year(best, rec):
             return best, "likely_same"
         return None, "different_person"
@@ -124,7 +126,7 @@ def pick_refresh_candidate(rec: dict, senses: list[dict]) -> tuple[dict | None, 
     if len(candidates) != 1:
         return None, "no_clear_candidate"
     cand = candidates[0]
-    if is_person(cand) or (is_work(cand) and not is_work(rec)):
+    if is_person(cand) or (is_work(cand) and not is_work(rec)) or of_another_work(cand, rec):
         return None, "different_kind"
     if cjk_len(cand.get("summary")) < MUCH_SHORTER * cjk_len(rec.get("summary")):
         return None, "overlay_says_less"

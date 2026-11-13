@@ -161,6 +161,21 @@ def test_merge_guards_for_people_empty_abstracts_and_shorter_texts(tmp_path):
                     flags=["summary_from_section"]).to_dict()
     short = _overlay("经济价值", 9, "经济价值分直接经济价值和间接经济价值。", label="经济学术语").to_dict()
     assert pick_refresh_candidate(long, [short]) == (None, "overlay_says_less")
+    # 鬼谷子: the thinker is not replaced by the figure of an animation that is named after him (0.20 alike)
+    from baike2yomitan.sense import of_another_work, work_it_is_in
+    thinker = _primary("鬼谷子", 10, "王诩，又名王禅，鬼谷子，是历史上极富神秘色彩的传奇人物，春秋时人。常入云梦山采药修道。因隐居清溪之鬼谷，故自称鬼谷先生。"
+                       "春秋战国时期著名的思想家、谋略家、兵家、教育家，是纵横家的鼻祖。", tags=["思想家", "历史"]).to_dict()
+    figure = _overlay("鬼谷子", 11, "鬼谷子，是中国3D武侠动画《秦时明月》系列中，根据中国春秋战国时期思想家鬼谷子衍生出的剧情设定，"
+                      "是历代纵横家首领的称号。截止至动画第5部上映，仅提及3位鬼谷子。").to_dict()
+    assert work_it_is_in(figure) == "秦时明月" and of_another_work(figure, thinker)
+    assert pick_refresh_candidate(thinker, [figure]) == (None, "different_article")
+    # the same figure in both, although the 2019 page names the work another way, or only its tags say that it is made up
+    old = {"summary": "戴宗，江州人，外号神行太保，在水浒英雄榜上排在第二十位。", "tags": []}
+    assert not of_another_work({"summary": "戴宗是中国古典小说《水浒传》中的人物，绰号神行太保。"}, old)
+    old = {"summary": "猎潮者耐普图隆是他所统治领域——深海的灵魂。", "tags": ["游戏", "魔兽世界"]}
+    assert not of_another_work({"summary": "耐普图隆，暴雪娱乐公司出品的游戏《魔兽争霸》中的角色，水元素领主。"}, old)
+    # a work that is only quoted or played in is no such thing
+    assert work_it_is_in({"summary": "九卿，是中国古代中央部分行政长官的总称。司马迁的史类文学作品《史记》中记载“闻古之圣人，不居朝廷”。"}) is None
     _write(tmp_path / "p.jsonl", [Record.from_dict(word)])
     _write(tmp_path / "o.jsonl", [Record.from_dict(empty)])
     stats = merge(str(tmp_path / "p.jsonl"), str(tmp_path / "o.jsonl"), str(tmp_path / "m.jsonl"))

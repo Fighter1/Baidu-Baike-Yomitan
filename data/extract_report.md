@@ -1,75 +1,77 @@
 # Extract report
 
-Generated 2026-11-12 05:54.
+Generated 2026-11-12 16:06.
 
 ## audit_baike-full
 | metric | value |
 |---|---:|
-| golden_checks | 95 |
-| headwords | 4,799,711 |
-| headwords_whose_first_sense_is_a_work | 268,157 |
+| golden_checks | 18 |
+| golden_failures | 3 |
+| headwords | 4,799,684 |
+| headwords_whose_first_sense_is_a_work | 268,159 |
 | headwords_with_a_repeated_sense | 127 |
 | headwords_with_a_work_above_another_sense | 2,196 |
-| headwords_with_several_senses | 46,905 |
-| of_those_without_a_label | 74,559 |
-| rows | 8,822,016 |
+| headwords_with_several_senses | 46,902 |
+| of_those_without_a_label | 74,556 |
+| rows | 8,821,962 |
 | scope | full |
-| senses | 4,877,405 |
-| senses_of_headwords_with_several | 124,599 |
-| senses_with_sections | 76,396 |
-| senses_without_a_reading | 148,222 |
-| summaries_cut_inside_a_quote | 8,158 |
+| senses | 4,877,374 |
+| senses_of_headwords_with_several | 124,592 |
+| senses_with_sections | 76,387 |
+| senses_without_a_reading | 148,218 |
+| summaries_cut_inside_a_quote | 8,156 |
 | summaries_starting_mid_list | 14,404 |
 | summaries_that_say_nothing | 386 |
 
 ## audit_baike-lexical
 | metric | value |
 |---|---:|
-| golden_checks | 64 |
+| golden_checks | 18 |
+| golden_failures | 14 |
 | headwords | 82,060 |
 | headwords_whose_first_sense_is_a_work | 1,880 |
 | headwords_with_a_work_above_another_sense | 62 |
 | headwords_with_several_senses | 11,897 |
-| of_those_without_a_label | 16,946 |
-| rows | 167,377 |
+| of_those_without_a_label | 16,947 |
+| rows | 167,375 |
 | scope | lexical |
 | senses | 104,657 |
 | senses_of_headwords_with_several | 34,494 |
-| senses_with_sections | 29,040 |
-| summaries_cut_inside_a_quote | 134 |
+| senses_with_sections | 29,033 |
+| summaries_cut_inside_a_quote | 132 |
 | summaries_starting_mid_list | 396 |
 | summaries_that_say_nothing | 71 |
 
 ## build_baike-full
 | metric | value |
 |---|---:|
-| entries | 8,822,016 |
-| entries_traditional | 3,944,611 |
-| records_seen | 4,877,405 |
-| seconds | 897 |
-| senses_with_sections | 76,396 |
+| entries | 8,822,128 |
+| entries_traditional | 3,944,651 |
+| records_seen | 4,877,477 |
+| seconds | 548 |
+| senses_with_sections | 76,387 |
 | term_banks | 883 |
-| titles_with_multiple_senses | 46,905 |
-| zip_bytes | 1,432,224,070 |
+| titles_with_multiple_senses | 46,995 |
+| zip_bytes | 1,432,181,191 |
 
 ## build_baike-lexical
 | metric | value |
 |---|---:|
-| entries | 167,377 |
-| entries_traditional | 62,720 |
-| records_seen | 4,877,405 |
-| seconds | 122 |
-| senses_with_sections | 29,040 |
+| entries | 167,395 |
+| entries_traditional | 62,725 |
+| records_seen | 4,877,477 |
+| seconds | 70 |
+| senses_with_sections | 29,035 |
 | term_banks | 17 |
-| titles_with_multiple_senses | 46,905 |
-| zip_bytes | 36,424,312 |
+| titles_with_multiple_senses | 46,995 |
+| zip_bytes | 36,396,382 |
 
 **Skipped at build**
 
 | reason | count |
 |---|---:|
 | excluded_tag | 2,167 |
-| not_in_cedict | 4,770,581 |
+| not_in_cedict | 4,770,640 |
 
 ## build_ci-smoke
 | metric | value |
@@ -85,8 +87,8 @@ Generated 2026-11-12 05:54.
 | metric | value |
 |---|---:|
 | cedict_headwords | 121,633 |
-| lexical_entries_after_tag_exclusion | 167,377 |
-| records_with_cedict_title | 106,824 |
+| lexical_entries_after_tag_exclusion | 167,395 |
+| records_with_cedict_title | 106,837 |
 
 ## extract_563w
 | metric | value |
@@ -94,10 +96,10 @@ Generated 2026-11-12 05:54.
 | input | data\raw\563w\563w_baidubaike.json |
 | input_rows | 5,634,898 |
 | output | data\records.jsonl |
-| records_with_sections | 90,200 |
-| records_written | 4,674,104 |
-| rows_with_entities_decoded | 48,144 |
-| seconds | 1,350 |
+| records_with_sections | 90,197 |
+| records_written | 4,674,076 |
+| rows_with_entities_decoded | 49,214 |
+| seconds | 819 |
 
 **Drops by reason**
 
@@ -105,11 +107,11 @@ Generated 2026-11-12 05:54.
 |---|---:|
 | dup_lemma_id | 238 |
 | dup_title_summary | 368 |
-| no_summary_no_sections | 208,414 |
-| summary_not_prose | 73,742 |
-| summary_not_prose_fallback | 50,668 |
-| summary_too_short | 470,879 |
-| summary_too_short_fallback | 140,521 |
+| no_summary_no_sections | 208,428 |
+| summary_not_prose | 73,738 |
+| summary_not_prose_fallback | 50,670 |
+| summary_too_short | 470,894 |
+| summary_too_short_fallback | 140,522 |
 | title_empty | 9 |
 | title_too_long | 15,955 |
 
@@ -118,15 +120,15 @@ Generated 2026-11-12 05:54.
 | reason | count |
 |---|---:|
 | infobox_below_top_skipped | 11,008 |
-| kept_alias_line | 556 |
-| kept_short_sentence | 16,281 |
+| kept_alias_line | 557 |
+| kept_short_sentence | 16,284 |
 | pinyin_line_kept | 73,007 |
 | sense_label_from_section | 40,120 |
 | summary_from_definition_line | 16,861 |
-| summary_from_later_paragraph | 1,371,254 |
-| summary_from_section | 2,708,055 |
+| summary_from_later_paragraph | 1,371,257 |
+| summary_from_section | 2,708,054 |
 | summary_from_section_after_empty_summary | 2,172 |
-| summary_from_section_after_short_summary | 60,943 |
+| summary_from_section_after_short_summary | 60,941 |
 | summary_joined_lines | 919 |
 
 ## extract_hf
@@ -136,9 +138,9 @@ Generated 2026-11-12 05:54.
 | input | data\raw\overlay |
 | input_rows | 587,819 |
 | output | data\records.hf.jsonl |
-| records_with_sections | 44,608 |
+| records_with_sections | 44,597 |
 | records_written | 413,563 |
-| seconds | 703 |
+| seconds | 420 |
 
 **Drops by reason**
 
@@ -171,18 +173,18 @@ Generated 2026-11-12 05:54.
 ## merge
 | metric | value |
 |---|---:|
-| added | 203,301 |
-| added_extra_sense_of_known_title | 74,648 |
-| added_new_title | 128,653 |
-| kept_primary | 59,429 |
+| added | 203,401 |
+| added_extra_sense_of_known_title | 74,747 |
+| added_new_title | 128,654 |
+| kept_primary | 59,530 |
 | key | title |
 | overlay_records | 413,563 |
-| primary_records | 4,674,104 |
-| records_written | 4,877,405 |
-| refreshed | 178,963 |
-| skipped | 90,798 |
+| primary_records | 4,674,076 |
+| records_written | 4,877,477 |
+| refreshed | 178,861 |
+| skipped | 90,901 |
 | skipped_primary_title_ambiguous | 70 |
-| skipped_repeated_sense | 2,759 |
+| skipped_repeated_sense | 2,761 |
 | skipped_weak_sense_of_known_title | 28,540 |
 
 ## Source inspection: deviations from the task description
@@ -902,7 +904,8 @@ build: 13 are about markup, 6 are not tags (`<A Better Day>`, `<li quan>`),
 7 are unpaired or broken (`</B>`, `<p zdct3">`), and 4 are layout tags that
 stay because the text says `元素` or `标签` somewhere else, about something
 else (后孙家鲍村: `耕地1241</SPAN>亩`). The guard looks at the whole text; a
-window around the tag would catch those four.
+window around the tag would catch those four. (That split was wrong: seven
+texts kept a layout tag for this reason, not four. See the next section.)
 
 **Private-use characters.** 472 of them, 179 different code points, in 274
 body texts and 22 titles. Three kinds:
@@ -986,3 +989,242 @@ without a reading 148,222, summaries cut inside a quote 8,158.
 is shown with the explanations; `□` stands where the character is unknown,
 which is honest and no better to read; the 4 layout tags and 7 broken ones
 named above; the rest of the lists in the two sections above.
+
+## Fourth local build, 2026-11-12: which texts are about markup
+
+The note above said four layout tags stayed because of a word used about
+something else. Counted again on the records of that build, with the
+pattern the code itself uses, 18 body texts still had a layout tag: 10 about
+markup, one that is pasted advertising code (环法车赛, kept because of its
+`<SCRIPT>`), and seven that should have lost theirs:
+
+| entry | tag | what kept it |
+|---|---|---|
+| 后孙家鲍村 | `耕地1241</SPAN>亩` | `多种矿物元素` |
+| 抹茶故事 | `<p>抹茶故事MATCHA…</p>` | `时尚元素` |
+| 古董玉器装饰：玉意奢华 | `<p> 《古董玉器装饰…` | `异域文化的元素` |
+| 闪耀☆南国小麦色 | `<p>暑假的旅行！` | `元素`, 230 characters on in the raw text |
+| 继发性肾病 | `血管病</a>变` | `食物成分标签`, 1,900 characters on |
+| 拉尔夫·阿尔菲 | `（<noinclude>）` | `大爆炸元素合成`, `希腊字母` |
+| 普实台文 | `（<noinclude>，简称PSDB）` | `拉丁字母` |
+
+Two of them show no such word in the text on the record. The guard reads
+the whole raw text, and the word stands past the place where the summary is
+cut.
+
+In the raw 2019 text the guard kept the tags of 515 texts out of 3,073 that
+have one. Measured from the nearest tag to the nearest guard word, `html`,
+`超链接`, `控件` and `标签` are about markup almost wherever they stand
+(`ed2k`, `preg_match_all`, `Core标签库` at 60 to 100 characters), `标签` far
+away is a label (`食物成分标签`, `标签文件`), and `元素` and `字母` are wrong
+at any distance: `宗教</a>元素` at 0, `<a href="#">第一主族元素` at 4,
+`合金元素…<sup>[14]</sup>` at 25. A window alone does not separate them. The
+rule now:
+
+- `HTML`, `超文本`, `超链接`, `控件`, `标识符` or a tag of another kind
+  (`<body>`, `<ul>`, `<table>`, `<script>`) anywhere, as before, but outside
+  the layout tags themselves: a map pasted as
+  `<iframe src="…/mapElem.html">` no longer counts.
+- `标签` within 100 characters of a tag.
+- `元素` and `字母` only where they name a tag: after a Latin name or a tag
+  (`iframe元素`, `<p> 元素`, `<book> 元素`), or right in front of an opening
+  tag that does not break a line (`页面元素<div>`, not `微量元素<br>`).
+
+Old against new, the way the last section learned to check: every raw 2019
+row with a layout tag converted with both trees (2,644 rows) gives seven
+records that differ, the seven above, each in its summary only; all 587,819
+overlay rows give none. On the raw texts 93 of the 515 lose their tags.
+Most are prose (`木鱼石`, `炒金`, `碳水化合物`). Some are code samples whose
+only guard word was `元素` for an array or DOM element (`POS()`,
+`CSS伪元素`, `锚点`); none of those texts is on a record.
+
+The build: 11 body texts with a layout tag (the 10 about markup and
+环法车赛). Headwords, senses, rows and sections as in the build above; the
+full zip is 1,432,224,070 bytes, the lexical one unchanged. Golden words 99
+of 99 (full) and 64 of 64 (lexical), 4 lines added.
+
+**Not fixed**: where a `<noinclude>` stood for a name the corpus lost, an
+empty bracket is left (`阿尔菲（）`, `普实台文（，简称PSDB）`); a text that
+says `HTML` about something else keeps its tags (广州市诚毅科技软件开发有限公司
+in a section that is not shown), and so do `H13钢` and five pages with the
+same text (`合金元素…<sup>[14]</sup>`, not shown either; why was not looked
+into); the 7 unpaired or broken tags.
+
+## Fifth local build, 2026-11-12: hollow brackets, the other tags, chemical symbols
+
+The list above, taken up item by item. Counting each item first changed
+what the work was: two of them were far larger than the list said.
+
+**Brackets that hold nothing.** The two empty brackets where a `<noinclude>`
+stood were the smallest case of something common. On the records of the
+build above, by what the bracket still held:
+
+| what is left in the bracket | summaries | sections | under a CC-CEDICT headword |
+|---|---:|---:|---:|
+| only a reference label: `（基本信息栏参考资料：）` | 960 | 23 | 754 |
+| a separator at the end: `（Anthony David Wall，）` | 515 | 21 | 37 |
+| nothing, after a Chinese character: `达尼埃莱·帕波尼（），男` | 268 | 5 | 10 |
+| only another label: `（希伯来语：）`, `（学名：）` | 83 | 2 | 8 |
+| a separator at the start: `延森（，1873-1950）` | 43 | 0 | 0 |
+| nothing, after a function name: `rindex（）` | 662 | 6 | 0 |
+
+The raw rows show two causes. The reference labels are ours: the snapshot
+has `（基本信息栏主要参考资料：[3] ）`, the citation rule takes the `[3]`,
+and the label stays behind, under the summary of 731 CC-CEDICT headwords,
+most of them single characters (争, 事, 喜). Everything else is hollow in the
+corpus already, in both sources: a name in Korean, Hebrew or Japanese
+script that the corpus lost (`谚文日（朝鲜语：）`, `小林一茶（，こばやし…）`).
+
+The rule, in `clean_text` right after the citation marks go:
+
+- A bracket holding only a reference label goes. With a colon any label that
+  says 参考, 来源, 来自 or 资料; without one only what a page says of itself
+  (`（参考资料）`, `（以上参考资料）`): `（教学参考资料）` is a kind of book.
+- A bracket holding only the label of a name or a language goes
+  (`学名`, `英文`, `…语`, `…文`, `简称` …); where other things stand beside
+  it, only the label goes: `（俄语：Жердевка，英语：）` keeps the Russian.
+- A separator right after the opening bracket goes when at least three
+  characters follow (`地球坐标（，λ）` lost a letter, not a name). One right
+  before the closing bracket goes after a letter, a digit or a full stop
+  that is not Chinese: `（达吐，）西域术语` and `（虽然是简陋的地方，…，）又有…`
+  are words somebody put in brackets with their comma.
+- An empty bracket goes after a Chinese character when punctuation or one
+  of `是即为的和与及被于又也成创位坐座在` follows. Read one by one, many of
+  the 268 were something else, and the rule takes 97 of them:
+  `内设机构共计（）个`, a blank nobody filled in (pages of county
+  offices); `笔名（）介`,
+  `下山（）林场`, a character the corpus lost inside a word; an exercise
+  (`正确的一项是（）` at the end of a line); and pages that show brackets
+  (`小括弧()、中括弧[]`, `加圆括符（），`). Those stay: no removal on a
+  page that says 括号, 括弧, 括符, 全角, 半角, 符号 or 标点.
+- An ASCII bracket with only ASCII inside is left alone: `(1,)` is a tuple.
+
+A note that still names its source stays: 503 summaries end with one
+(`（基本信息主要来源：《新华写字字典第2版》、汉典网）`,
+`（概述图参考来源：中国自然标本馆）`).
+
+**Tags.** "7 unpaired or broken" was an undercount: the pattern that counted
+them stopped at 60 characters and at Chinese, so it missed the long ones. A
+wider one found about 55 entries with a tag that was shown: 29 summaries
+with an `<img …>`, a dozen with a heading, `<CENTER>`, `<pre>` or a comment,
+15 cut off or glued to the text. Running the rule over the raw rows found
+the most common kind only then: comments, `<!--end-->` and the like in 114
+summaries, most of them of officials and regulations.
+
+- Added to the tags that are taken out: `h1`–`h6`, `center`, `pre`, `img`
+  with an attribute (`<IMG>` alone is a tag somebody writes about), and
+  comments, also one that the text ends in.
+- A quoted attribute value may hold a `>`:
+  `onload="if(this.width>screen.width-500)…"` left half a tag behind.
+- A closing `</a>`, `</b>`, `</i>`, `</u>` without its opening tag goes
+  (`有限责任公司</B>是…`). An opening one alone stays: `字素<a>`.
+- A tag the corpus cut off with the end of a text goes (`…而努力奋斗。<br`,
+  `《<a target=_blank`), not after a letter or a digit (`其中0<p`). The first
+  version let the cut-off tag run to the end of the text whatever stood in
+  between and took the second half of 曹司's 释义 with it; a unit test
+  caught it. No sentence mark may stand inside.
+- `<p zdct3">` and `<p class="zdct8`: paragraphs of 汉典 with their quotes
+  broken, in the 释义 of 碧澄澄, 曹司 and 复室.
+
+**The guard.** `H13钢` kept its `<sup>` because of `Ni元素`: the rule read
+any Latin name in front of `元素` as the name of a tag. Of the 422 raw texts
+that keep their tags, 30 do so for this reason alone, and 9 of those are
+wrong: seven pages with the steel text (not six, as the note above has it),
+酸 (`H、O元素`) and one where `cabaret元素` is a kind of music. A chemical
+symbol now counts only where the text has a tag of that name (`P元素`
+beside a `<p>`). Run again over the raw rows, the steel pages and 酸 lose
+their tags; the music page stays as it is.
+
+Old against new:
+
+- Raw 2019 rows with a layout tag, both trees: 3,877 rows, 192 records
+  differ (151 summaries, 10 info tables, 7 section texts). 26 records are
+  no longer entries: 19 whose summary was a picture or a tag and at most
+  the title (`川菜翠`, `步步高3680`), and 7 that had only passed a rule
+  because of a comment (`雿 <!--编辑词条创建词条-->`, `中共义乌市委常委、
+  副市长<!--end-->`, a `简历：…` line behind `<!--begin-->`).
+- All 587,819 overlay rows: 2,098 summaries and 61 section sets differ, no
+  record is lost. 19 section labels go: a 详解 that was only
+  `（参考资料：）` (卯, 辰, 百, 白, 有, 鱼) and a 释义 that was only
+  `康熙字典笔画( 蝥:15；)`.
+- The bracket rule over the body texts of the build above: 1,562 summaries
+  and 47 section texts change; every group was read.
+
+The build against the one above:
+
+| | before | now |
+|---|---:|---:|
+| brackets with only a reference label | 983 | 4 |
+| brackets with a separator at the end | 536 | 293 |
+| empty brackets after a Chinese character | 273 | 175 |
+| brackets with only another label | 85 | 39 |
+| brackets with a separator at the start | 43 | 4 |
+| body texts with a layout tag | 11 | 13 |
+| headwords, full | 4,799,711 | 4,799,686 |
+| senses, full | 4,877,405 | 4,877,378 |
+| senses showing sections, full | 76,396 | 76,386 |
+| headwords, lexical | 82,060 | 82,060 |
+| senses, lexical | 104,657 | 104,656 |
+| senses showing sections, lexical | 29,040 | 29,032 |
+| zip bytes, full | 1,432,224,070 | 1,432,179,579 |
+| zip bytes, lexical | 36,424,312 | 36,406,221 |
+
+Shown labels: 释义 43,948 to 43,941, 详解 16,460 to 16,453, 出处 and 示例
+one less each; records with sections 121,077 to 121,068.
+
+Record by record: 1,545 summaries changed by a hollow bracket alone (861
+under a CC-CEDICT headword), 141 otherwise (tags and comments; one is 奇,
+below), 39 section texts (29 by a hollow bracket alone), 14 section labels
+gone, 23 info tables (a value
+is cleaned the same way: `高贤贞()`, `（Hary，）`). The 13 texts that keep
+a layout tag are the 11 from before and two that the wider list of tags
+now sees, both about markup (`alt标签`, `for each元素`).
+
+37 records went and 10 came. 26 are the tag-only entries above. The other
+11 and the 10 are a side effect on the merge: the hollow bracket had been
+part of the text that the 2019 record and the snapshot are compared by.
+
+- `事` and `匿`: the 2019 stubs (`事，中国汉字，主要阐述…`,
+  `匿，音读ni…基本意义有隐藏`) shared the word `基本` with
+  `（基本信息栏来源：）` and with nothing else in the snapshot. Score 0.100
+  and 0.133 with the bracket, 0.050 and 0.067 without; the line is 0.10. They
+  are two senses now, the snapshot first.
+- `奇`: its snapshot now has under 60% of the Chinese characters of the
+  weak 2019 text it used to replace; the characters of the bracket had
+  counted.
+- `保`, `培`, `婢`: the other way round. Without the bracket they score
+  0.103, 0.107 and 0.100. One sense where there were two.
+- `潘婕`: the 2019 record of an actress is no longer overwritten with the
+  summary of an e-sports manager.
+- `诸葛亮`, `尼古拉斯`: one of two game sprites with almost the same line
+  now counts as a repeat of the other.
+
+A single character whose 2019 record stands beside an unmerged snapshot
+labelled 汉语汉字 is nothing new: 1,023 in the build above, 1,021 now.
+
+The 4 reference labels left are of other kinds (`（图片链接：）`,
+`（从本科开始填写，时间应连续，参考样式如下：）`). On the raw 2019 texts
+the wider list finds 4,412 with a layout tag (3,073 before); 559 keep
+theirs.
+
+Golden words: 115 of 115 (full) and 68 of 68 (lexical), 16 lines added.
+193 tests. Senses without a reading 148,219, summaries cut inside a quote
+8,156.
+
+**Not fixed**: the 1,021 characters just named, which a rule for pages of
+single characters in the merge would settle; a hollow bracket in ASCII with
+only ASCII inside (`崔健吾(,1913 - 1941)`); an empty bracket in front of any
+other character (`从头甲基化 表观遗传学（）中的`), 175 texts with the blanks
+and the lost characters; a separator at the end of a bracket after a
+Chinese character, 293 texts, most of them meant; the 503 notes that name a
+source. Tags: pasted advertising code that opens with `<script …>` (泰国陆军
+L119式105毫米轻型火炮, 红罗宾石楠, and 环法车赛 as before), because
+`<script` is what marks a text about markup; table tags (`<th>` in D381 and
+白昆弘), which pages about HTML name with `标记`; an opening `<b>` or `<a>`
+alone; and about ten one-off breakages (`</A编剧`, `<a a.孔德`,
+`<A 电力电缆 a>`, `<font span="" 案发于…`, `of<sup<sup<sup cl`,
+`<IMG class=tex alt="1 < p`). Left as they were on purpose, neither on any
+record: code samples whose only word about markup is `元素` for an array
+or DOM element lose their tags (`POS()`, `CSS伪元素`), and a text that says
+`HTML` of something else keeps them (41 raw texts are kept by that word
+alone, a handful of them not about markup going by their titles).

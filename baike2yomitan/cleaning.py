@@ -82,15 +82,52 @@ _EXTRA_ENTITIES = {
 # 耕地1241</SPAN>亩. With an attribute only as name=value: <A Year Without Rain> is an album and <li quan> a
 # reading. <stdio.h>, <math> and the like are text.
 _TAG_END = r"(?:\s+[A-Za-z-]+\s*=[^<>]*|\s*/)?\s*>"
-_TAG_RE = re.compile(rf"</?(?:br|wbr|p|div|li|span|strong|em|font|sup|sub|iframe|noinclude){_TAG_END}"
-                     rf"|<a\s+[A-Za-z-]+\s*=[^<>]*>", re.I)
-# <a>, <b>, <i>, <u> only as a pair: 字母<u> is a letter
+_TAG_NAMES = r"br|wbr|p|div|li|span|strong|em|font|sup|sub|iframe|noinclude|h[1-6]|center|pre|th|td|tr|thead|tbody"
+# A picture only with its attributes (<IMG> alone is a tag somebody writes about), and what a comment hides.
+# <p zdct3"> and <p class="zdct8 are paragraphs of the dictionary site 汉典 whose quotes the corpus broke.
+# A script that is fetched from somewhere is code of the page the text was copied from, an advertisement or
+# a counter: 交付给泰国的这 <script language=javascript1.1 src="http://ad.…"></script>. To the last ">" in front
+# of the next tag, because 红罗宾石楠 has src="/plus/count.php?aid=Fields[" id?]?>&mid=…" type="text/javascript">.
+_TAG_RE = re.compile(rf"<p\s+(?:class=\"?)?zdct\d+\"?>?"
+                     rf"|</?(?:{_TAG_NAMES}){_TAG_END}"
+                     # a quoted value may hold a ">": onload="if(this.width>screen.width-500)…"
+                     rf"|<(?:a|img)\s+[A-Za-z-]+\s*=(?:(?:\"[^\"<]{{0,300}}\"|[^<>\"])*|[^<>]*)>"
+                     rf"|<script\b(?=[^<]{{0,400}}\bsrc\s*=)[^<]{{0,600}}>(?:\s*</script\s*>)?"
+                     rf"|<!--[^<>]*(?:-->|$)", re.I)
+# <a>, <b>, <i>, <u> only as a pair: 字母<u> is a letter. A closing one alone is still a tag: 有限责任公司</B>是…,
+# also one that lost its ">" in front of a Chinese character: Sydney Pollack</A编剧：….
 _PAIRED_TAG_RE = re.compile(r"<([abiu])>(.*?)</\1>", re.I | re.S)
-_CLOSING_A_RE = re.compile(r"</[aA]>")
-_LINE_TAG_RE = re.compile(r"<(?:br|wbr|p)\b", re.I)
+_CLOSING_TAG_RE = re.compile(rf"</[abiu]>|</(?:{_TAG_NAMES}|[abiu])(?=[一-鿿])", re.I)
+# A tag that the corpus cut off with the end of a text or of a line: …而努力奋斗。<br, 《下笔入神》、《<a target=_blank,
+# 所证实。<DIV id=FrontComContent_detail01 class=style=. Not 其中0<p, which is the end of an inequality, and no
+# sentence after it: <p class="zdct8(2).吏目。元王仲文…
+# Inside a text only a closing tag or one with an attribute counts as cut off with its line: 于是<P and
+# 高自旋∆<p at the end of a line are what is left of a formula.
+_CUT_ATTR = r"\s+[A-Za-z-]+\s*=[^<>。，；！？\n]{0,400}"
+_CUT_TAG_RE = re.compile(rf"(?<![A-Za-z0-9Α-ω∆\s<=>])(?:"
+                         rf"(?:</?(?:{_TAG_NAMES})(?:{_CUT_ATTR})*|</?(?:a|img)(?:{_CUT_ATTR})?)\s*\Z"
+                         rf"|(?:</(?:{_TAG_NAMES}|a)|<(?:{_TAG_NAMES})(?:{_CUT_ATTR})+)[^\S\n]*$)", re.I | re.M)
+# Tags broken in a way that occurs once, each in one article, and what they stood for.
+_BROKEN_TAGS = {
+    "of<sup<sup<sup cl": "of",                                  # all there is of 102715
+    "测<BR试": "测试",                                            # 核磁共振实验200例
+    "<a a.孔德": "A.孔德",                                        # 实证哲学教程
+    "<IMG class=tex alt=\"1 < p": "1 < p",                      # 哈代空间: the formula is what the picture says
+    "<A 电力电缆 a>": "电力电缆",                                 # 油浸纸绝缘电缆
+    "<font span=\"\" 案发于一体": "案发于一体",                    # 广州市杰泰电子科技有限公司
+    "<b>" + chr(0x3000) * 2 + "《现场安全员岗位通》": "《现场安全员岗位通》",   # after two full-width spaces
+    "人大附中<a>西山学校": "人大附中西山学校",
+    "<B制作以传统工艺": "制作以传统工艺",                          # 于都峡山道菜
+}
+_TAG_NAME_RE = re.compile(r"</?([A-Za-z]+[1-6]?)")
+_LINE_TAG_RE = re.compile(r"<(?:br|wbr|p|h[1-6]|center|pre|tr)\b", re.I)
 # A text about markup means its tags: li 标签定义列表项目。以<li>开始</li>结束. These say that it is one,
 # wherever they stand outside a layout tag (a map pasted as <iframe src="…/mapElem.html"> says nothing).
-_ABOUT_MARKUP_RE = re.compile(r"html|标识符|超文本|超链接|控件|<(?:body|head|ul|ol|table|script)\b", re.I)
+# Not html in the name of a file (club.qq.com/moo.shtml, robot.html). Code says it too: <?php, echo "…",
+# <form>, document.write(, and CSS has 伪元素.
+_ABOUT_MARKUP_RE = re.compile(r"(?<![./A-Za-z])x?html(?![a-z])|标识符|超文本|超链接|控件|伪元素"
+                              r"|<(?:body|head|ul|ol|table|script|form|input|map|area)\b|<\?(?:php|xml)\b"
+                              r"|\becho\s*[('\"]|document\.write\(|getElement", re.I)
 # 标签 is also a label on a tin, so it has to stand near a tag: 继发性肾病 has 血管病</a>变 and, 1,900
 # characters on, 食物成分标签.
 LABEL_NEAR = 100
@@ -98,16 +135,40 @@ LABEL_NEAR = 100
 # <p> 元素, iframe元素, <book> 元素, 页面元素<div>. Not 微量元素<br>, where a line ends. The three characters
 # stand for an opening layout tag, a closing one and one that breaks a line.
 _OPENING, _CLOSING, _BREAK = chr(2), chr(3), chr(4)
-_NAMES_A_TAG_RE = re.compile(rf"(?:[A-Za-z>]\s?|[{_OPENING}{_BREAK}]\s*)(?:元素|字母)"
-                             rf"|(?:元素|字母)[\s：:（(]{{0,3}}{_OPENING}")
+_NAMES_A_TAG_RE = re.compile(rf"(?:(?<![A-Za-z])(?P<name>[A-Za-z]+)\s?|>\s?|[{_OPENING}{_BREAK}]\s*)(?P<what>元素|字母)"
+                             rf"|(?:元素|字母)[\s：:（(]{{0,3}}{_OPENING}"
+                             # 一个新的 <tr> 标记, <del>删除线</del> 标记, 锚点代码为：<a name="锚点名">
+                             rf"|[{_OPENING}{_CLOSING}{_BREAK}]\s?标记|代码(?:为|如下|是)?[\s：:]{{0,3}}{_OPENING}")
+# Ni元素 is nickel. H13钢 has Cr﹑Mn﹑Mo﹑Si和Ni元素 and a <sup>[14]</sup>; 酸 has H、O元素. A symbol names a tag
+# only where the text has a tag of that name: P元素 next to a <p>.
+_CHEMICAL_SYMBOLS = frozenset(
+    "H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr Rb Sr Y Zr "
+    "Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir "
+    "Pt Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl "
+    "Mc Lv Ts Og".split())
 
 
 def _tag_spans(text: str) -> list[tuple[int, int]]:
     """Where the layout tags of a text are."""
-    spans = {m.span() for m in _TAG_RE.finditer(text)} | {m.span() for m in _CLOSING_A_RE.finditer(text)}
+    spans = {m.span() for m in _TAG_RE.finditer(text)} | {m.span() for m in _CLOSING_TAG_RE.finditer(text)}
     for m in _PAIRED_TAG_RE.finditer(text):
         spans |= {(m.start(), m.start() + 3), (m.end() - 4, m.end())}
+    spans |= {m.span() for m in _CUT_TAG_RE.finditer(text)}
     return sorted(spans)
+
+
+def _names_a_tag(marked: str, text: str, spans: list[tuple[int, int]]) -> bool:
+    """Whether 元素 or 字母 names a tag somewhere in a text whose layout tags are marked."""
+    tags = None
+    for m in _NAMES_A_TAG_RE.finditer(marked):
+        name = m.group("name")
+        if name and name in _CHEMICAL_SYMBOLS and m.group("what") == "元素":
+            if tags is None:
+                tags = {t.group(1).lower() for t in (_TAG_NAME_RE.match(text, start) for start, _ in spans) if t}
+            if name.lower() not in tags:
+                continue
+        return True
+    return False
 
 
 def _speaks_of_tags(text: str, spans: list[tuple[int, int]]) -> bool:
@@ -117,7 +178,7 @@ def _speaks_of_tags(text: str, spans: list[tuple[int, int]]) -> bool:
         kind = _CLOSING if text[start + 1] == "/" else _BREAK if _LINE_TAG_RE.match(text, start) else _OPENING
         marked[start:end] = kind * (end - start)
     marked = "".join(marked)
-    if _ABOUT_MARKUP_RE.search(marked) or _NAMES_A_TAG_RE.search(marked):
+    if _ABOUT_MARKUP_RE.search(marked) or _names_a_tag(marked, text, spans):
         return True
     at = marked.find("标签")
     while at >= 0:
@@ -130,10 +191,14 @@ def _speaks_of_tags(text: str, spans: list[tuple[int, int]]) -> bool:
 def strip_tags(text: str) -> str:
     """Body text without the layout tags that the corpus kept as text. A tag
     that broke a line leaves a space."""
+    for broken, meant in _BROKEN_TAGS.items():
+        if broken in text:
+            text = text.replace(broken, meant)
     spans = _tag_spans(text)
     if not spans or _speaks_of_tags(text, spans):
         return text
-    return _PAIRED_TAG_RE.sub(r"\2", _TAG_RE.sub(" ", text)).replace("</a>", "").replace("</A>", "")
+    text = _CUT_TAG_RE.sub("", text)
+    return _CLOSING_TAG_RE.sub("", _PAIRED_TAG_RE.sub(r"\2", _TAG_RE.sub(" ", text)))
 
 
 # Characters of the private-use area mean something only in the font or the encoding they were typed in.
@@ -292,6 +357,74 @@ def strip_citations(text: str) -> str:
     return _CITATION_RE.sub("", text)
 
 
+# A bracket that holds nothing any more. Either its citation marks went (（基本信息栏参考资料：[2] ） is under
+# the summary of 731 words of CC-CEDICT), or the corpus lost a name in another script:
+# 帕勒马希姆（希伯来语：）, 延森（，1873-1950）, 安东尼·沃尔（Anthony David Wall，）.
+_BRACKET_RE = re.compile(r"([（(])([^（）()]{0,60})([）)])")
+_SEPARATORS = "，,、；;"
+_REFERENCE_ONLY_RE = re.compile(
+    r"[^，,。；;：:！？]{0,12}(?:参考|来源|来自|资料)[^，,。；;：:！？]{0,2}[：:]|概述图片?[：:]"
+    # without a colon only what a page says of itself: （教学参考资料） is a kind of book
+    r"|(?:(?:基本)?信息栏?(?:主要|使用)?|概[述念]内?图片?|摘要图|名片|图片|释义|词语|以上|见)?参考(?:资料|来源)(?:来源)?")
+_NAME_LABEL = r"(?:学名|英文名?|外文名?|原名|原题|本名|别名|又名|简称|拼音|[一-鿿]{1,5}[语文])[：:]"
+_NAME_ONLY_RE = re.compile(_NAME_LABEL)
+_NAME_FIRST_RE = re.compile(rf"(?:{_NAME_LABEL}\s*[{_SEPARATORS}]\s*)+")
+_NAME_LAST_RE = re.compile(rf"(?:\s*[{_SEPARATORS}]\s*{_NAME_LABEL})+$")
+MIN_AFTER_SEPARATOR = 3         # 地球坐标（，λ） lost a letter, not a name
+# An empty one goes where a name stood in front of it and the sentence goes on behind it: 刘言（），吉州庐陵人,
+# 桑吉省（）是…. Not 内设机构共计（）个 and 党员（）名, blanks nobody filled in, not 笔名（）介 and
+# 下山（）林场, where it stands for a character, not at the end of a line, where an exercise has its blank
+# (正确的一项是（）), and not on a page that shows brackets: 小括弧()、中括弧[].
+_EMPTY_BRACKET_RE = re.compile(r"(?<=[一-鿿·])[（(]\s*[）)](?=[，,。.、；;：:！？!?》」』”’\"）)\]】是即为的和与及被于又也成创位坐座在])")
+_ABOUT_BRACKETS_RE = re.compile(r"括号|括弧|括符|[全半]角|符号|标点|函数\s*[（(]\s*[）)]|方法\s*[（(]\s*[）)]|填空|填入")
+
+
+def _hollow_bracket(m: re.Match) -> str:
+    opening, inner, closing = m.groups()
+    bare = inner.strip()
+    if not bare:
+        return m.group(0)
+    if _REFERENCE_ONLY_RE.fullmatch(bare) or _NAME_ONLY_RE.fullmatch(bare):
+        return ""
+    if opening == "(" and bare.isascii():
+        return m.group(0)                   # (1,) is a tuple
+    rest = _NAME_LAST_RE.sub("", _NAME_FIRST_RE.sub("", bare, count=1) if _NAME_FIRST_RE.match(bare) else bare)
+    if _NAME_ONLY_RE.fullmatch(rest):
+        return ""                           # （德语：，波兰语：，索布语：）
+    if rest[:1] in _SEPARATORS and len(rest.lstrip(_SEPARATORS + " ")) >= MIN_AFTER_SEPARATOR:
+        rest = rest.lstrip(_SEPARATORS + " ")
+    if rest[-1:] in _SEPARATORS:
+        before = rest.rstrip(_SEPARATORS + " ")[-1:]
+        if before and (before.isalnum() or before == ".") and not _is_han(before):
+            rest = rest.rstrip(_SEPARATORS + " ")
+    if rest == bare:
+        return m.group(0)
+    return opening + rest + closing if rest else ""
+
+
+# A note of the page on where its picture, its info table or its text is from. With the source as a citation
+# mark the note goes above; with the source in words it would stay under 503 summaries:
+# （基本信息主要来源：《新华写字字典第2版》、汉典网）, （概述图参考来源：中国自然标本馆）, （资料来源：中国植物物种信息）.
+# What it says of the picture means nothing without the picture (（概述图人物：乔瓦尼·巴蒂斯塔·佩尔戈莱西）).
+# A label needs its colon: （信息资料管理系统） is a name.
+_SOURCE_NOTE_RE = re.compile(
+    r"[（(]\s*(?:概[述念]内?图|摘要图"
+    r"|(?:(?:基本)?信息栏?|名片|图片|参考|资料|数据)[^，,。；;：:（）()]{0,10}(?:参考|来源|来自|资料|链接)[^，,。；;：:（）()]{0,3}[：:])"
+    r"[^（）()]{0,120}[）)]")
+
+
+def strip_hollow_brackets(text: str) -> str:
+    """Body text without the brackets that hold nothing any more, without the
+    separator that is left at the edge of one that lost a part, and without
+    the page's notes on its sources."""
+    if "（" not in text and "(" not in text:
+        return text
+    text = _BRACKET_RE.sub(_hollow_bracket, _SOURCE_NOTE_RE.sub("", text))
+    if _EMPTY_BRACKET_RE.search(text) and not _ABOUT_BRACKETS_RE.search(text):
+        text = _EMPTY_BRACKET_RE.sub("", text)
+    return text
+
+
 def strip_ui_labels(text: str, title: str | None = None) -> str:
     """Remove leaked interface labels. A compound that is part of the article's
     own title is prose, not a label: 语音编辑器是一种… must not lose 语音编辑."""
@@ -351,7 +484,7 @@ def clean_text(text: str | None, title: str | None = None) -> str:
     if not text:
         return ""
     text = text.replace("\\n", "\n")  # literal backslash-n sequences in 563w
-    text = strip_citations(text)
+    text = strip_hollow_brackets(strip_citations(text))
     text = strip_captions(text, title)
     text = strip_ui_labels(text, title)
     text = normalize_whitespace(text)

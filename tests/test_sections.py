@@ -229,7 +229,7 @@ def test_layout_tags_in_body_text():
     assert body("<A href=\"http://example.com/1.htm\">果糖代谢紊乱</a>，教您<a>怎么做冬菇鸡冻</a>") == " 果糖代谢紊乱，教您怎么做冬菇鸡冻"
     assert body("一统天下.&lt；br&gt；九五至尊") == "一统天下. 九五至尊"      # a tag that was escaped
     for text in ("专辑<A Year Without Rain>的首支单曲", "#include <stdio.h>", "醴泉 <li quan> 释名", "形式如<math>(2^p+1)/3</math>的质数",
-                 "li 标签定义列表项目。以<li>开始</li>结束", "nl2br() 函数插入 HTML 换行符 (<br />)。", "<b> 《现场安全员岗位通》",
+                 "li 标签定义列表项目。以<li>开始</li>结束", "nl2br() 函数插入 HTML 换行符 (<br />)。", "<b> 《现场安全员手册》",
                  "意思是超文本引用。1.内部连接：<a href=\"#/URL\">name</a>"):
         assert body(text) == text
     assert decode_entities("<p>标题</p>") == "<p>标题</p>"         # a title is left alone
@@ -246,6 +246,43 @@ def test_layout_tags_in_body_text():
                  "创建页面元素<div id=\"ID值\"></div>", "返回 category 属性是否是 <book> 元素的 ID 属性：document.write(\"<br />\")",
                  "将PHP控件化，既可以实现各种表格列表又可以实现<Li></Li>形式的列表", "食品标签上的换行写作<br>"):
         assert body(text) == text
+    # pictures, headings, comments and a closing tag without its opening one
+    assert body("有油点。<img src=分生孢子盘.jpg> <IMG height=300 src=\"http://example.com/1.jpg\" width=400 border=0>直立") == "有油点。   直立"
+    assert body("<h1>伯特绦虫病</h1>由司氏伯特绦虫引起<!--End Attachment-->") == " 伯特绦虫病 由司氏伯特绦虫引起 "
+    assert body("<CENTER>新颖婚礼</CENTER><pre id=\"bks_2clhe5cl\"> 乐团介绍") == " 新颖婚礼   乐团介绍"
+    assert body("北京信益达劳务服务有限责任公司</B>是按照公司法成立的公司") == "北京信益达劳务服务有限责任公司是按照公司法成立的公司"
+    # a tag cut off with the end of the text, and the paragraphs of 汉典 with their quotes broken
+    assert body("为培养新一代建设人才而努力奋斗。<br") == "为培养新一代建设人才而努力奋斗。"
+    assert body("并分别获鼓励奖。《下笔入神》、《<a target=_blank") == "并分别获鼓励奖。《下笔入神》、《"
+    assert body("倒映着碧澄澄的一片晴空。”<p zdct3\">(2).形容深蓝而阴森。") == "倒映着碧澄澄的一片晴空。” (2).形容深蓝而阴森。"
+    assert body("入主曹司。”<p class=\"zdct8(2).吏目。元王仲文《救孝子》") == "入主曹司。” (2).吏目。元王仲文《救孝子》"
+    # a chemical symbol in front of 元素 names no tag
+    assert body("Cr﹑Mn﹑Mo﹑Si和Ni元素影响钢的淬透性<sup>[14]</sup>。") == "Cr﹑Mn﹑Mo﹑Si和Ni元素影响钢的淬透性 [14] 。"
+    assert body("某些有机物中的H、O元素以2：1的原子个数比脱出<p>浓硫酸") == "某些有机物中的H、O元素以2：1的原子个数比脱出 浓硫酸"
+    for text in ("其中k=0,1. 则称X服从（0-1）分布，其中0<p", "另外，标记<IMG>和<OBJECT>允许图形等对象直接嵌入文件。",
+                 "字素<a>,无论它的形式是A，a，或是α", "其显示效果相当于P元素。<p>段落</p>", "HTML <td> 标签的 nowrap 属性",
+                 "循环群<a>的阶"):
+        assert body(text) == text
+    # a script fetched from elsewhere, table cells, a closing tag without its ">", a tag cut off with a line
+    assert body("交付给泰国的这 <script language=javascript1.1 src=\"http://ad.example.com/adj;num=366?\"></script>") == "交付给泰国的这  "
+    assert body("蔷薇科石楠属<SCRIPT language=JavaScript src=\"/plus/count.php?aid=Fields[\" id?]?>&mid=Fields[\"memberID\"];?>\" "
+                "type=\"text/javascript\">常绿小乔木") == "蔷薇科石楠属 常绿小乔木"
+    assert body("二等座 <th>站次 </th>0上海虹桥-14:47") == "二等座  站次  0上海虹桥-14:47"
+    assert body("导演：悉尼·波拉克 Sydney Pollack</A编剧：戴维·雷法尔") == "导演：悉尼·波拉克 Sydney Pollack编剧：戴维·雷法尔"
+    assert body("已充分为用户所证实。<DIV id=FrontComContent_detail01-129_cont_1 class=style= \n长光公司成立于1990年") == \
+        "已充分为用户所证实。\n长光公司成立于1990年"
+    # breakages that occur once
+    assert body("社会学家<a a.孔德的代表作。") == "社会学家A.孔德的代表作。"
+    assert body("共十二章。<b>" + chr(0x3000) * 2 + "《现场安全员岗位通》内容科学合理") == "共十二章。《现场安全员岗位通》内容科学合理"
+    assert body("对于 <IMG class=tex alt=\"1 < p，实哈代空间基本上等于 L 空间。") == "对于 1 < p，实哈代空间基本上等于 L 空间。"
+    # code keeps its tags: a script written out, PHP, a tag that is called a 标记 or shown as 代码
+    for text in ("<script type=\"text/javascript\">document.write(\"Hello\")</script><br>", "<?php echo pos($arr) . \"<br />\"; ?>",
+                 "表示一个新的 <tr> 标记，并把它插入表中的指定位置。", "可以使用 <sub>下标</sub> 标记某些信息。",
+                 "这时可以看到的锚点代码为：<a name=\"锚点名\"></a>", "p:first-letter 伪元素用于向文本的首字母添加样式：<p>The first</p>",
+                 "<form>First name: <input type=\"text\" name=\"firstname\"><br></form>"):
+        assert body(text) == text
+    # html in the name of a file says nothing
+    assert body("详见 club.example.com/moo.shtml<br>或 robot.html") == "详见 club.example.com/moo.shtml 或 robot.html"
 
 
 def test_characters_of_the_private_use_area():
