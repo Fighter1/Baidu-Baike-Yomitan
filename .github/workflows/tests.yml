@@ -32,19 +32,47 @@ jobs:
           PYTHONUTF8: "1"
         run: python -m pytest -q
 
-      - name: Release dry run against the test fixtures
-        # Builds a tiny zip with the update URLs for this repository and checks
-        # that `release --dry-run` accepts it; nothing is uploaded.
+      - name: Build a few entries the way a release is built, validate, audit, release dry run
+        # The release command line on four records: the build flags of the
+        # `all` call in build-release.yml (tests/test_release.py checks that
+        # they are the same) and this repository's update URLs. Then the schema
+        # over every entry, golden words for what the flags have to produce
+        # (no golden check reads the info table: --infobox is built and
+        # schema-checked only), and `release --dry-run`; nothing is uploaded.
         env:
           PYTHONUTF8: "1"
           GH_TOKEN: ${{ github.token }}
         run: |
-          python - "$RUNNER_TEMP/ci-records.jsonl" <<'EOF'
+          records="$RUNNER_TEMP/ci-records.jsonl" zip="$RUNNER_TEMP/ci-smoke.zip" golden="$RUNNER_TEMP/ci-golden.tsv"
+          python - "$records" <<'EOF'
           import sys
           from baike2yomitan.records import Record, RecordWriter
+
+          def record(lemma_id, title, summary, **more):
+              return Record(source="563w", title=title, summary=summary, lemma_id=lemma_id,
+                            url=f"https://baike.baidu.com/view/{lemma_id}.htm", **more)
+
           with RecordWriter(sys.argv[1]) as w:
-              w.write(Record(source="563w", title="红色食品", summary="红色食品是指颜色为红色的食品，如西红柿、红枣等。",
-                             sense_label="", lemma_id=1, tags=[], url="https://baike.baidu.com/view/1.htm", quality_flags=[]))
+              w.write(record(1, "红色食品", "红色食品是指颜色为红色的食品，如西红柿、红枣等。",
+                             infobox=[["中文名", "红色食品"], ["类别", "食品"]]))
+              w.write(record(2, "里面", "里面，汉语词语，意思是内部，与“外面”相对。", sense_label="汉语词语",
+                             sections=[["出处", "《朱子语类》卷六七：“圣人说得里面有许多道理。”"]]))
+              w.write(record(3, "群众", "群众，汉语词语，指人民大众或居民的大多数。"))
+              w.write(record(4, "于为群", "于为群，男，汉族，1960年生，中共党员，大学学历。", tags=["人物"]))
           EOF
-          python -m baike2yomitan build --records "$RUNNER_TEMP/ci-records.jsonl" --out "$RUNNER_TEMP/ci-smoke.zip" --update-url github
-          python -m baike2yomitan release "$RUNNER_TEMP/ci-smoke.zip" --dry-run
+          python -m baike2yomitan build --records "$records" --out "$zip" \
+            --pinyin --traditional s2tw --traditional-lookup s2hk,s2t --infobox --sections --update-url github
+          python -m baike2yomitan validate "$zip" --validate-mode full
+          # headword, check, value: one line per thing a flag is there for
+          printf '%s\t%s\t%s\n' \
+            红色食品 reading "hóng sè shí pǐn" \
+            里面 traditional 裡面 \
+            里面 traditional_box 裡面=裡面 \
+            里面 traditional 裏面 \
+            里面 traditional_box 裏面=裡面、裏面 \
+            群众 traditional 羣眾 \
+            群众 traditional 羣衆 \
+            于为群 traditional_box 於為群=于為群、於為群 \
+            里面 section_has 朱子语类 > "$golden"
+          python -m baike2yomitan audit "$zip" --golden "$golden"
+          python -m baike2yomitan release "$zip" --dry-run

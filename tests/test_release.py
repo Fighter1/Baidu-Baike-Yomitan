@@ -349,3 +349,22 @@ def test_release_notes_get_the_changes_section(built_zip, monkeypatch, tmp_path)
     monkeypatch.setattr(rel, "_gh", gh)
     assert rel.release([built_zip], repo=REPO, stats_dir="nowhere") == 0
     assert "Changes since" not in (tmp_path / "dist" / "v2026.11.08.1.notes.md").read_text(encoding="utf-8")
+
+
+def test_the_tests_workflow_builds_the_way_the_release_does():
+    # tests.yml builds a few entries on every push to try the release command line; that only
+    # says something while its flags are those of the `all` call in build-release.yml
+    import re
+
+    workflows = os.path.join(os.path.dirname(os.path.dirname(SCHEMA_DIR)), ".github", "workflows")
+
+    def flags(name: str, command: str) -> list[str]:
+        with open(os.path.join(workflows, name), encoding="utf-8") as f:
+            lines = f.read().replace("\\\n", " ").splitlines()
+        (line,) = [line for line in lines if f"python -m baike2yomitan {command} " in line]
+        # what shapes an entry or the index; --exclude-tags, --revision, --no-hash and the like do not
+        return re.findall(r"--(?:pinyin|infobox|sections|traditional(?:-lookup)? \S+|update-url \S+)", line)
+
+    release = flags("build-release.yml", "all")
+    assert "--traditional s2tw" in release and "--update-url github" in release and len(release) >= 6
+    assert flags("tests.yml", "build") == release

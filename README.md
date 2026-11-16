@@ -1022,7 +1022,7 @@ Three workflows under `.github/workflows/`:
 
 | workflow | trigger | what it does |
 |---|---|---|
-| `tests.yml` | every push to `main`, every pull request | installs requirements on Python 3.11 and 3.12, runs pytest (fixtures only, no corpus), builds a one-entry zip with this repository's update URLs and runs `release --dry-run` on it |
+| `tests.yml` | every push to `main`, every pull request | installs requirements on Python 3.11 and 3.12, runs pytest (fixtures only, no corpus), then builds four records with the flags of the release build (`--pinyin --traditional s2tw --traditional-lookup s2hk,s2t --infobox --sections --update-url github`; a test keeps the two workflows' flags the same), runs the schema over every entry, checks nine golden lines for what the flags have to produce, and runs `release --dry-run` on the zip |
 | `upstream-check.yml` | Mondays 06:00 UTC, or manually | runs `inputs pin`; if a dataset commit changed, pushes branch `upstream-inputs` and opens (or refreshes) a pull request with the manifest diff. Downloads nothing |
 | `build-release.yml` | manual only (*Actions → Build and release → Run workflow*) | checks the revision, frees runner disk, downloads the pinned corpora, runs `all` with `--update-url github` and revision `UTC-date.run-number`, uploads the reports as an artifact and publishes the release as *latest*, tagged at the commit that was built. Inputs: `publish` (off keeps the zips as a 7-day artifact instead), `skip_validation`, `revision` (four integers) |
 
