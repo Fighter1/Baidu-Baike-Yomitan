@@ -111,7 +111,7 @@ def _build_one(records, out, a, cedict_words=None, exclude_tags=None, readings_c
                   infobox=a.infobox, sections=a.sections, cedict_words=cedict_words, exclude_tags=exclude_tags,
                   common_words=common_words,
                   revision=a.revision, update_base_url=update_base_url,
-                  readings_cedict=readings_cedict)
+                  readings_cedict=readings_cedict, traditional_lookup=getattr(a, "traditional_lookup", ()))
     save_stats("build_" + os.path.splitext(os.path.basename(out))[0], stats)
     _print_stats(f"build {out}", stats)
     return stats
@@ -254,6 +254,16 @@ def _revision_arg(value: str) -> str:
         raise argparse.ArgumentTypeError(str(e)) from None
 
 
+def _lookup_arg(value: str) -> tuple[str, ...]:
+    """argparse type for --traditional-lookup: 's2hk,s2t' -> ("s2hk", "s2t")."""
+    from .build import parse_lookup
+
+    try:
+        return parse_lookup(value)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(str(e)) from None
+
+
 def cmd_release(a) -> int:
     from .release import ReleaseError, release
 
@@ -338,6 +348,12 @@ def main(argv=None) -> int:
                         help="also emit traditional-script headwords via OpenCC: s2tw gives Taiwan "
                              "character forms (著, 裡, 為), s2t keeps 着, 裏, 爲, s2twp also rewrites "
                              "vocabulary, s2hk gives Hong Kong forms")
+        sp.add_argument("--traditional-lookup", type=_lookup_arg, default=(), metavar="s2hk,s2t",
+                        help="with --traditional: also index every entry under the spellings of these OpenCC "
+                             "standards (s2t, s2tw, s2hk; comma-separated) where they differ from the one "
+                             "--traditional gives. An entry shows such a spelling only when it was found "
+                             "by it: 里面 displays 裡面, and looked up as 裏面 it displays 裡面、裏面. "
+                             "Default: off")
         sp.add_argument("--infobox", action="store_true", help="render 基本信息 pairs below the summary")
         sp.add_argument("--sections", action="store_true",
                         help="render the labelled sections of a word's page (释义, 出处, 用法 …) below the summary")
@@ -444,4 +460,6 @@ def main(argv=None) -> int:
     sp.set_defaults(fn=cmd_all)
 
     a = p.parse_args(argv)
+    if getattr(a, "traditional_lookup", ()) and not a.traditional:
+        p.error("--traditional-lookup needs --traditional: the lookup spellings go with a traditional headword")
     return a.fn(a)

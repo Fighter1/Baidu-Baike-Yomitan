@@ -12,6 +12,8 @@
 #     any VALUE               some sense mentions VALUE
 #     ends VALUE              the first sense's summary ends with VALUE
 #     traditional VALUE       the headword is also indexed under this spelling
+#     traditional_box S=TEXT  the entry found by the spelling S shows TEXT in its traditional box
+#                             (S is the headword itself or one of its spellings; TEXT empty: no box)
 #     senses_max N            it has at most N senses
 #     table_lacks VALUE       no sense's info table mentions VALUE
 
@@ -54,6 +56,18 @@
 里面	traditional	裡面
 为什么	traditional	為什麼
 不着四六	traditional	不著四六	full
+
+# -- … and an entry is also found under the Hong Kong and the OpenCC spelling. Found that way it shows
+#    the spelling after the Taiwan one; found by the title or the Taiwan spelling it shows the Taiwan one only
+#    (--traditional-lookup s2hk,s2t; a build without that option fails the first six)
+里面	traditional	裏面
+为什么	traditional	爲什麼
+群众	traditional	羣眾
+群众	traditional	羣衆
+里面	traditional_box	裏面=裡面、裏面
+群众	traditional_box	羣衆=群眾、羣衆
+里面	traditional_box	裡面=裡面
+里面	traditional_box	里面=裡面
 
 # -- Headwords that were dropped by mistake
 编辑	present

@@ -100,6 +100,39 @@ def test_several_processes_and_small_term_banks_give_the_same_answer(tmp_path, m
     assert one["headwords_with_a_repeated_sense"] == 1 and one["headwords_with_several_senses"] == 3
 
 
+@pytest.mark.parametrize("bank_size", [1, 2, 3])
+def test_lookup_only_rows_are_read_across_term_banks(tmp_path, monkeypatch, bank_size):
+    # 群众 has four rows (群众, 群眾, 羣眾, 羣衆): with small banks they lie in two, three or four of them
+    monkeypatch.setattr("baike2yomitan.report.STATS_DIR", str(tmp_path / "stats"))
+    monkeypatch.setattr("baike2yomitan.build.BANK_SIZE", bank_size)
+    with RecordWriter(str(tmp_path / "r.jsonl")) as w:
+        for r in RECORDS + [_rec("群众", 12, "群众，汉语词语，指人民大众或居民的大多数。"),
+                            _rec("群众", 13, "《群众》是中共江苏省委主办的理论刊物。")]:
+            w.write(r)
+    out = str(tmp_path / "baike-full.zip")
+    build(str(tmp_path / "r.jsonl"), out, pinyin=True, traditional="s2tw", traditional_lookup=("s2hk", "s2t"),
+          pinyin_overrides=None)
+    golden = _golden(tmp_path, "里面\ttraditional\t裡面\n里面\ttraditional\t裏面\n群众\ttraditional\t群眾\n"
+                               "群众\ttraditional\t羣眾\n群众\ttraditional\t羣衆\n群众\tsenses_max\t2\n"
+                               "群众\tfirst\t汉语词语\n时间\tfirst_not_work\n板儿砖\ttraditional\t板兒磚\n"
+                               # what the traditional box shows depends on the spelling the entry was found by
+                               "里面\ttraditional_box\t裏面=裡面、裏面\n群众\ttraditional_box\t羣衆=群眾、羣衆\n"
+                               "群众\ttraditional_box\t羣眾=群眾、羣眾\n群众\ttraditional_box\t群眾=群眾\n"
+                               "群众\ttraditional_box\t群众=群眾\n北京\ttraditional_box\t北京=\n")
+    one, fail_one = audit(out, golden, workers=1)
+    three, fail_three = audit(out, golden, workers=3)
+    assert one == three and fail_one == fail_three == []
+    # the lookup-only rows are rows and nothing else: 18 + 里面's one, and 群众 twice with four rows each
+    assert (one["headwords"], one["senses"], one["rows"]) == (8, 13, 18 + 1 + 8)
+    assert one["headwords_with_several_senses"] == 4 and one["senses_of_headwords_with_several"] == 9
+    _, failures = audit(out, _golden(tmp_path, "群众\ttraditional\t群衆\n群众\ttraditional_box\t羣衆=群眾\n"
+                                               "群众\ttraditional_box\t群衆=群眾、群衆\n北京\ttraditional_box\t北京=北京\n"),
+                        workers=bank_size)
+    assert len(failures) == 4 and "other spellings ['羣眾', '羣衆', '群眾']" in failures[0]
+    assert "found by 羣衆 it shows '群眾、羣衆'" in failures[1] and "not indexed as 群衆" in failures[2]
+    assert "found by 北京 it shows no traditional box" in failures[3]
+
+
 def test_rates(zip_path):
     stats, _ = audit(zip_path, [])
     assert (stats["headwords"], stats["senses"], stats["rows"]) == (7, 11, 18)   # seven senses also have a traditional row
@@ -124,6 +157,15 @@ def test_entry_parts_reads_the_labelled_blocks():
         {"tag": "div", "data": {"baike": "summary"}, "content": "内部。"}]}]
     assert entry_parts(content) == {"traditional-term": "裡面", "simplified-term": "里面", "sense-label": "汉语词语", "summary": "内部。"}
     assert entry_parts(["plain definition"]) == {}
+
+
+def test_traditional_box_without_the_lookup_option(zip_path, tmp_path):
+    golden = _golden(tmp_path, "里面\ttraditional_box\t裡面=裡面\n里面\ttraditional_box\t里面=裡面\n时间\ttraditional_box\t時間=時間\n")
+    assert audit(zip_path, golden)[1] == []
+    _, failures = audit(zip_path, _golden(tmp_path, "里面\ttraditional_box\t裏面=裡面、裏面\n"))
+    assert len(failures) == 1 and "not indexed as 裏面" in failures[0]
+    with pytest.raises(ValueError):             # the spelling and what it shows, with = between them
+        _golden(tmp_path, "里面\ttraditional_box\t裡面\n")
 
 
 def test_golden_file_errors(tmp_path):

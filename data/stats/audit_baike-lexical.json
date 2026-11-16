@@ -1,11 +1,11 @@
 {
- "golden_checks": 71,
+ "golden_checks": 79,
  "headwords": 82062,
  "headwords_whose_first_sense_is_a_work": 1880,
  "headwords_with_a_work_above_another_sense": 62,
  "headwords_with_several_senses": 11905,
  "of_those_without_a_label": 16963,
- "rows": 167395,
+ "rows": 169635,
  "scope": "lexical",
  "senses": 104670,
  "senses_of_headwords_with_several": 34513,

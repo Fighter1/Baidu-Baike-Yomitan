@@ -88,13 +88,13 @@ Do not use `datasets.load_dataset` on the primary file: it would build a second
 python -X utf8 -m baike2yomitan extract --source 563w [--limit N] [--max-summary-chars 300]
 python -X utf8 -m baike2yomitan extract --source hf   [--limit N]
 python -X utf8 -m baike2yomitan merge                 # records.jsonl + records.hf.jsonl → records.merged.jsonl (keyed on title)
-python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-full.zip [--pinyin] [--traditional s2tw|s2t|s2twp|s2hk] [--infobox] [--sections]
+python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-full.zip [--pinyin] [--traditional s2tw|s2t|s2twp|s2hk [--traditional-lookup s2hk,s2t]] [--infobox] [--sections]
 python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-lexical.zip --cedict data/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz --exclude-tags 人物,企业,学校
 python -X utf8 -m baike2yomitan validate dist/baike-full.zip
 python -X utf8 -m baike2yomitan audit dist/baike-full.zip dist/baike-lexical.zip
 python -X utf8 -m baike2yomitan smoke dist/baike-full.zip
 python -X utf8 -m baike2yomitan sample --records data/records.merged.jsonl -n 20
-python -X utf8 -m baike2yomitan all --overlay-hf --pinyin --traditional s2tw --infobox --sections --exclude-tags 人物,企业,学校 --update-url github
+python -X utf8 -m baike2yomitan all --overlay-hf --pinyin --traditional s2tw --traditional-lookup s2hk,s2t --infobox --sections --exclude-tags 人物,企业,学校 --update-url github
 python -X utf8 -m baike2yomitan release --dry-run        # upload dist zips as a GitHub release (see below)
 ```
 
@@ -128,6 +128,7 @@ them when a rule changed.
 | `--pinyin` | build, all | fill Yomitan's reading field (`hóng sè shí pǐn`) from CC-CEDICT, the article's own pinyin, then pypinyin (see *Readings*); off by default, the reading is then empty |
 | `--readings-cedict PATH\|none` | build, all | CC-CEDICT export to take readings from; default is the `--cedict` file, else `data/cedict/…` when present |
 | `--traditional s2tw\|s2t\|s2twp\|s2hk` | build, all | also emit a traditional-script headword for every entry whose OpenCC conversion differs from the simplified title; same content and sequence number. The modes differ in character forms, see *Showing simplified and traditional together* |
+| `--traditional-lookup s2hk,s2t` | build, all | with `--traditional` only: also index every entry under the spellings of these OpenCC standards (`s2t`, `s2tw`, `s2hk`, comma-separated) where they differ from the one `--traditional` gives. An entry shows such a spelling only when it was found by it (裡面、裏面 for a lookup of 裏面, 裡面 otherwise); off by default, used for releases. See *Spellings an entry is only found by* |
 | `--infobox` | build, all | render the extracted infobox pairs (first six) as a two-column table under the summary |
 | `--sections` | build, all | show those sections under the summary, each with its label, where they say more than the summary |
 | `--cedict PATH` | build, all | `build`: keep only records whose title is a simplified CC-CEDICT headword (the lexical build). `all`: the MDBG export to use instead of `data/cedict/…`; a file named here is downloaded when missing and otherwise used as it is. `all` always builds both zips |
@@ -261,8 +262,8 @@ Outputs (figures from a local build of 2026-11-11 with the rules described here,
 - `data/records.jsonl` (4.67 M records), `data/records.hf.jsonl` (414 k), `data/records.merged.jsonl` (4.88 M) — one JSON record per sense
 - `data/extract_report.md` — drop counts by reason, quality flags, merge counts, heuristics notes
 - `data/short_summary_examples.md` — sampled analysis of the under-15-character drops that motivated the paragraph-walking fallback
-- `dist/baike-full.zip` — everything that survived extraction: 8.8 M entries (incl. 3.9 M traditional headwords), 883 term banks, ~1.4 GB
-- `dist/baike-lexical.zip` — only titles that are simplified CC-CEDICT headwords (107 k records), minus `--exclude-tags 人物,企业,学校` (2,167 dropped, 1,663 kept because they are ordinary words): 167 k entries, 36 MB
+- `dist/baike-full.zip` — everything that survived extraction: 8.8 M entries (incl. 3.9 M traditional headwords), 883 term banks, ~1.4 GB. With `--traditional-lookup s2hk,s2t`, which the release build adds: 9.05 M entries (227 k of them lookup-only spellings), 905 term banks, 7 MB more
+- `dist/baike-lexical.zip` — only titles that are simplified CC-CEDICT headwords (107 k records), minus `--exclude-tags 人物,企业,学校` (2,167 dropped, 1,663 kept because they are ordinary words): 167 k entries, 36 MB (170 k with the lookup-only spellings)
 - `dist/<name>.index.json` — a copy of each zip's `index.json`, written when `--update-url` is given (see *Self-updating dictionaries*)
 - `data/stats/*.json` — the counters behind the report and the release notes, including `audit_<zip>.json`
 
@@ -759,8 +760,9 @@ boxes are styled by a `styles.css` inside the zip, which Yomitan applies only
 to this dictionary's entries; a title that OpenCC leaves unchanged gets a
 single simplified box.
 
-The OpenCC mode decides which traditional spelling is stored, and a lookup
-only matches the spelling that is stored:
+The OpenCC mode decides which traditional spelling is stored and shown.
+Without `--traditional-lookup` (next section) a lookup only matches that
+spelling:
 
 | mode | 不着四六 | 里面 | 为什么 | 软件 |
 |---|---|---|---|---|
@@ -774,10 +776,13 @@ time the simplified form of another word, and OpenCC converts the other word:
 于荣海 → 於榮海, 范英 → 範英, 岳敏君 → 嶽敏君. Nothing in a title says whether it
 is a name, so a title that starts with one of these characters (于, 范, 余, 岳,
 游, 党, 沈, 胡, 姜, 钟 … 27 in `build.SURNAME_FORMS`) is indexed under both
-spellings (於榮海 and 于榮海) with the same content and sequence number. The
+spellings (於榮海 and 于榮海) with the same sequence number. The
 entry displays the name form when the summary reads as a biography (`，男，`,
 a year of birth) and OpenCC's form otherwise; a dictionary word (a CC-CEDICT
-headword) that is not a biography gets no name form at all. An ambiguous character
+headword) that is not a biography gets no name form at all. Found by the
+spelling it does not display, the entry shows both: the biography 于荣海
+displays 于榮海, and looked up as 於榮海 its box reads 于榮海、於榮海 (see the next
+section for how). An ambiguous character
 later in a title (子丑寅卯 → 子醜寅卯) is not handled.
 
 `s2t` keeps 着 for zháo/zhuó/zhe and writes 裏 and 爲, which Taiwanese text
@@ -786,6 +791,100 @@ the article titles. `s2t` also writes 牀, 峯 and 羣 where `s2tw` keeps 床, �
 and 群, so `s2tw` gives slightly fewer titles a separate traditional headword
 (8,809,667 entries in the full zip against 8,817,011). Releases up to
 `2026.11.09.3` were built with `s2t`.
+
+### Spellings an entry is only found by
+
+A text in Hong Kong forms or in OpenCC's default forms writes some words
+differently from the Taiwan spelling that `--traditional s2tw` stores, and
+would not find them. `--traditional-lookup s2hk,s2t` gives each entry one
+more term-bank entry per such spelling:
+
+| title | displayed (`s2tw`) | also found as (`s2hk`, `s2t`) | the box when found that way |
+|---|---|---|---|
+| 里面 | 裡面 | 裏面 | 裡面、裏面 |
+| 群众 | 群眾 | 羣眾, 羣衆 | 群眾、羣眾 and 群眾、羣衆 |
+| 为什么 | 為什麼 | 爲什麼 | 為什麼、爲什麼 |
+| 台湾 | 臺灣 | 台灣 | 臺灣、台灣 |
+| 说明 | 說明 | 説明 | 說明、説明 |
+| 床 | 床, the title: no box | 牀 | 牀 |
+
+The new entries carry the reading, score and sequence number of the title's
+own entry, and its content with one difference: the red traditional box holds
+the displayed spelling, then `、`, then the spelling the entry was found by.
+Whoever looks up 裏面 sees that 裏面 is this word; looked up as 里面 or 裡面 the
+entry shows 裡面 alone, and those two rows are byte for byte what they are
+without the option. Where the displayed spelling is the title itself and the
+entry has no red box (床), the row gets a box with its own spelling. Everything
+under the boxes is the same on all rows of an entry. It is not built again for
+these rows: `build.with_own_spelling` copies the entry shallowly and replaces
+the block of boxes, so sections and info table are made once per record.
+
+The name form that is indexed without being displayed (previous section) is
+such a row too, with or without the option: the biography 于荣海 displays 于榮海,
+and found as 於榮海 it shows 于榮海、於榮海. That is all the rule changes in a build
+without `--traditional-lookup`: 29,162 rows of the full dictionary (4,020 of
+them with a box of their own) and 22 of the lexical one.
+
+The option is off by default and needs `--traditional`.
+
+- **Standards.** `s2t`, `s2tw` and `s2hk`, any of them besides the one
+  `--traditional` names. `s2twp` is refused: it rewrites vocabulary, and 软件
+  would be found as 軟體.
+- **No spelling twice.** A spelling equal to the title (`s2t` leaves 着火 as
+  it is) or to one the entry already has gets no entry.
+- **Order.** Within a sense the term bank has the simplified title, the
+  displayed spelling, the name form if any, then the lookup-only spellings.
+  `audit` reads a sense as that run of rows, also when it lies in several
+  term banks, and takes label, summary, table and sections from the title's
+  row.
+- **Names.** The surname rule holds for every standard, under the same
+  conditions: the biography 于为群 displays 于為群, is indexed as 於為群 too, and
+  is found as 于為羣, 於為羣, 于爲羣 and 於爲羣.
+- **A spelling that is a headword itself gets no entry.** Hong Kong writes 臺
+  as 台, so 后台 would also be indexed as 後台, and Baike has an article titled
+  後台; 峰 would be indexed as 峯, which has its own article. Such a spelling
+  is found as that headword already: 107 rows in the full dictionary, 5 in
+  the lexical one. The headwords are noted during the first pass over the
+  records, and only those with a character the standards write differently
+  (159,523 of 4.8 M titles), so this costs no further pass. The peak memory
+  of the full build goes from 2,939 to 2,965 MB with the option.
+- **Conversions.** s2tw and s2hk are s2t followed by one table of single
+  characters (39 for Taiwan, 63 for Hong Kong). Where the Taiwan form has no
+  character its table writes, it is the s2t form, and where that has no
+  character the Hong Kong table replaces, it is the Hong Kong form as well,
+  so most titles need no further conversion. The answers
+  are the same as three OpenCC conversions for all 4,799,684 distinct titles
+  of the merged records (converting them takes 97 s instead of 238 s). A
+  title that comes more than once is converted once. If the installed OpenCC
+  is not laid out this way, every form is converted.
+
+Measured on the merged records of 2026-11-12, `--pinyin --traditional s2tw
+--infobox --sections`, without and with `--traditional-lookup s2hk,s2t`:
+
+| | full, without | full, with | lexical, without | lexical, with |
+|---|---:|---:|---:|---:|
+| term-bank entries | 8,822,128 | 9,049,260 | 167,395 | 169,635 |
+| of them lookup-only | 0 | 227,132 | 0 | 2,240 |
+| senses that have one | 0 | 222,378 | 0 | 2,220 |
+| term banks | 883 | 905 | 17 | 17 |
+| zip, bytes | 1,432,370,078 | 1,439,739,617 | 36,396,483 | 36,476,678 |
+| build, seconds (two runs each) | 793, 928 | 953, 1,059 | 125, 113 | 127, 113 |
+
+The zip grows by half a percent although the entries grow by 2.6%: a
+lookup-only row repeats the entry before it, which compresses to almost
+nothing. The build times are from one machine on one day, and two runs of
+the same build differ by more than the option adds: over the term-bank pass
+the option cost 7% in the first pair of runs and nothing measurable in the
+second.
+
+Yomitan's *Group related terms* mode builds one card from all term-bank
+entries of a sequence number: it lists their spellings as the card's
+headwords and folds entries with identical content into one. The rows that
+show their own spelling share the sequence number and differ in content, so
+in that mode a card is expected to list 群众, 群眾, 羣眾 and 羣衆 as headwords
+and to repeat the article for each lookup spelling, marked with the spelling
+it belongs to. The default mode shows only the spelling that was looked up
+and is not affected. This was not looked at in Yomitan.
 
 ### Readings
 
@@ -857,7 +956,7 @@ GitHub's `…/releases/latest/download/<asset>` URL always points at the newest
 non-draft release, so it is a stable target for both fields. The flow:
 
 ```bash
-python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-full.zip --pinyin --traditional s2tw --infobox --sections --update-url github
+python -X utf8 -m baike2yomitan build --records data/records.merged.jsonl --out dist/baike-full.zip --pinyin --traditional s2tw --traditional-lookup s2hk,s2t --infobox --sections --update-url github
 ```
 
 ```bash
@@ -889,7 +988,9 @@ with the same content. `release` then, through the `gh` CLI:
    `data/source-inputs.json`, unless `--notes-file` is given. When an earlier
    release exists, the notes end with a *Changes since `<its tag>`* section:
    - a table of entries, traditional headwords and term banks per zip with the
-     difference from the numbers in the earlier release's notes;
+     difference from the numbers in the earlier release's notes. Both tables get
+     a *lookup-only* column when a zip was built with `--traditional-lookup`;
+     an earlier release whose notes lack the column counts as having none;
    - whether the pinned dataset commits moved;
    - the subject line of every commit since the earlier tag, read from
      GitHub's compare API (up to 40 are listed);
@@ -1010,7 +1111,8 @@ release got wrong, as `headword<TAB>check<TAB>value<TAB>scope`:
 | `first_not_work` | the sense shown first is not a song, film, book … |
 | `any VALUE` | some sense mentions VALUE |
 | `ends VALUE` | the first sense's summary ends with VALUE |
-| `traditional VALUE` | the headword is also indexed under this spelling |
+| `traditional VALUE` | the headword is also indexed under this spelling, displayed or lookup-only |
+| `traditional_box SPELLING=TEXT` | found by SPELLING (the headword itself or one of its spellings), the entry shows TEXT in its traditional box, in every sense filed under that spelling: `裏面=裡面、裏面`, `裡面=裡面`. Nothing after `=` means no box |
 | `senses_max N` | it has at most N senses |
 | `table_lacks VALUE` | no sense's info table mentions VALUE |
 | `section_has VALUE` | some sense shows VALUE in its labelled sections (read as one text, `出处…用法…`) |
@@ -1021,7 +1123,10 @@ release got wrong, as `headword<TAB>check<TAB>value<TAB>scope`:
 printed with what was found instead (`明朝  reading  míng cháo: readings
 ['míng zhāo']`) and makes `audit`, and therefore `all` and the release
 workflow, exit non-zero: a release that brings an old mistake back is not
-published. Add a line whenever a wrong entry is fixed.
+published. Add a line whenever a wrong entry is fixed. Six lines (里面 found
+as 裏面, 为什么 as 爲什麼, 群众 as 羣眾 and 羣衆, and what the box shows for 裏面
+and 羣衆) hold only for a build with `--traditional-lookup s2hk,s2t`, which is
+how releases are built.
 
 **Rates.** The same pass counts, over every sense: summaries that say nothing
 beyond the title and its pinyin, summaries that start at item 2 of a list,

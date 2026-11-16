@@ -26,9 +26,9 @@ from .validate import worker_count
 
 GOLDEN_PATH = os.path.join("data", "golden_words.tsv")
 CHECKS = ("present", "absent", "reading", "first_reading", "first", "first_not_work", "any", "ends", "traditional",
-          "senses_max", "table_lacks", "section_has", "section_lacks", "summary_lacks")
-NEEDS_VALUE = {"reading", "first_reading", "first", "any", "ends", "traditional", "senses_max", "table_lacks",
-               "section_has", "section_lacks", "summary_lacks"}
+          "traditional_box", "senses_max", "table_lacks", "section_has", "section_lacks", "summary_lacks")
+NEEDS_VALUE = {"reading", "first_reading", "first", "any", "ends", "traditional", "traditional_box", "senses_max",
+               "table_lacks", "section_has", "section_lacks", "summary_lacks"}
 SCOPES = ("", "full", "lexical")
 
 _LIST_ITEM_RE = re.compile(r"^\s*(?:[2-9]|[1-9]\d)\s*[、.．)）]|^\s*[（(](?:[2-9]|[1-9]\d)[)）]|^\s*[⑵-⒇②-⑳]")
@@ -52,6 +52,10 @@ def load_golden(path: str = GOLDEN_PATH) -> list[dict]:
                                  f"check from {', '.join(CHECKS)}; got {line!r}")
             if check == "senses_max" and not value.isdigit():
                 raise ValueError(f"{path}:{n}: senses_max needs a number, got {value!r}")
+            if check == "traditional_box" and ("=" not in value or value.startswith("=")):
+                raise ValueError(f"{path}:{n}: traditional_box needs SPELLING=TEXT (the spelling the entry is found "
+                                 f"by, and what its traditional box shows then; nothing after = for no box), "
+                                 f"got {value!r}")
             out.append({"word": word, "check": check, "value": value, "scope": scope, "line": n})
     return out
 
@@ -87,14 +91,21 @@ def entry_parts(definitions) -> dict[str, str]:
 
 
 class Sense:
-    """One article as the zip shows it: the rows that share a sequence number."""
-    __slots__ = ("title", "seq", "reading", "score", "label", "summary", "terms", "table", "sections")
+    """One article as the zip shows it: the rows that share a sequence number.
+    `boxes`: for every spelling the article is filed under, the title
+    included, what the traditional box shows when it is found by that
+    spelling ("" for no box)."""
+    __slots__ = ("title", "seq", "reading", "score", "label", "summary", "boxes", "table", "sections")
 
-    def __init__(self, title: str, seq: int, reading: str, score, label: str, summary: str, terms=(), table: str = "",
+    def __init__(self, title: str, seq: int, reading: str, score, label: str, summary: str, boxes=None, table: str = "",
                  sections: str = ""):
         self.title, self.seq, self.reading, self.score = title, seq, reading, score
         self.label, self.summary, self.table, self.sections = label, summary, table, sections
-        self.terms = {title, *terms}
+        self.boxes = {title: "", **(boxes or {})}
+
+    @property
+    def terms(self) -> set[str]:
+        return set(self.boxes)
 
     def as_record(self) -> dict:
         return {"title": self.title, "sense_label": self.label, "summary": self.summary}
@@ -138,6 +149,13 @@ def _check(golden: dict, senses: list[Sense]) -> str | None:
     if check == "traditional":
         got = sorted(set().union(*(s.terms for s in senses)) - {word})
         return None if value in got else f"other spellings {got}"
+    if check == "traditional_box":          # SPELLING=TEXT, in every sense that is filed under the spelling
+        spelling, _, text = value.partition("=")
+        found = [s.boxes[spelling] for s in senses if spelling in s.boxes]
+        if not found:
+            return f"not indexed as {spelling}; spellings {sorted(set().union(*(s.terms for s in senses)))}"
+        other = [box for box in found if box != text]
+        return None if not other else f"found by {spelling} it shows " + (repr(other[0]) if other[0] else "no traditional box")
     if check == "senses_max":
         return None if len(senses) <= int(value) else f"{len(senses)} senses"
     if check == "table_lacks":
@@ -158,11 +176,20 @@ def _check(golden: dict, senses: list[Sense]) -> str | None:
 # --- reading the zip, one term bank per task ----------------------------------
 #
 # A sense is the run of adjacent rows that share a sequence number: the
-# simplified headword first, then its traditional spellings. Such a run can
-# straddle two term banks, and each bank is read by itself, so a bank may open
-# with rows whose simplified row is in the bank before it. They are recognised
-# by their term differing from the simplified headword named inside the entry,
-# and are handed back as "orphans" for the parent to attach.
+# simplified headword first, then its traditional spellings, the ones the
+# entry shows and after them the ones it is only found by (build
+# --traditional-lookup). Such a run can straddle term banks, with small banks
+# more than two, and each bank is read by itself, so a bank may open with rows
+# whose simplified row is in a bank before it. They are recognised by their
+# term differing from the simplified headword named inside the entry, and are
+# handed back as "orphans" for the parent to attach.
+#
+# The rows of a sense do not all carry the same entry: a row found by a
+# spelling the entry does not show names that spelling in its traditional box
+# (裡面、裏面). The simplified headword inside is the same on all of them, and so
+# is everything under the boxes, so label, summary, table and sections are
+# read from the title's row; the traditional box is read from every row of the
+# headwords that are kept.
 
 _worker: dict = {}
 
@@ -187,26 +214,26 @@ def _titles_with_lower_senses(name: str) -> set[str]:
 
 def _read_bank(name: str) -> tuple[collections.Counter, list[tuple], list[tuple]]:
     """Second pass: (counts for this bank, senses of the headwords to keep,
-    orphan rows of kept headwords as (title, sequence, term))."""
+    orphan rows of kept headwords as (title, sequence, term, traditional box))."""
     keep = _worker["keep"]
     stats: collections.Counter = collections.Counter()
     kept: list[tuple] = []
     orphans: list[tuple] = []
-    seq_now, terms_now, title_now = None, None, None
+    seq_now, boxes_now, title_now = None, None, None
     for term, reading, _dt, _rules, score, definitions, seq, _tt in loads(_worker["zip"].read(name)):
         stats["rows"] += 1
         if seq == seq_now:
-            if terms_now is not None:
-                terms_now.append(term)
+            if boxes_now is not None:
+                boxes_now[term] = entry_parts(definitions).get("traditional-term", "")
             elif title_now in keep:              # still inside the run that opened this bank
-                orphans.append((title_now, seq, term))
+                orphans.append((title_now, seq, term, entry_parts(definitions).get("traditional-term", "")))
             continue
-        seq_now, terms_now = seq, None
+        seq_now, boxes_now = seq, None
         parts = entry_parts(definitions)
         title = title_now = parts.get("simplified-term") or term
         if term != title:                        # a traditional row whose sense began in the bank before
             if title in keep:
-                orphans.append((title, seq, term))
+                orphans.append((title, seq, term, parts.get("traditional-term", "")))
             continue
         summary, label = parts.get("summary", ""), parts.get("sense-label", "")
         stats["senses"] += 1
@@ -221,8 +248,8 @@ def _read_bank(name: str) -> tuple[collections.Counter, list[tuple], list[tuple]
         if "sections" in parts:
             stats["senses_with_sections"] += 1
         if title in keep:
-            terms_now = []
-            kept.append((title, seq, reading, score, label, summary, terms_now, parts.get("infobox", ""),
+            boxes_now = {title: parts.get("traditional-term", "")}
+            kept.append((title, seq, reading, score, label, summary, boxes_now, parts.get("infobox", ""),
                          parts.get("sections", "")))
         elif is_work({"title": title, "sense_label": label, "summary": summary}):
             stats["headwords_whose_first_sense_is_a_work"] += 1
@@ -270,12 +297,12 @@ def audit(zip_path: str, golden: list[dict] | None = None,
     for bank_stats, kept, bank_orphans in _run(_read_bank, names, workers, zip_path, frozenset(several | wanted)):
         stats.update(bank_stats)
         orphans.extend(bank_orphans)
-        for title, seq, reading, score, label, summary, terms, table, sections in kept:
-            sense = senses[title, seq] = Sense(title, seq, reading, score, label, summary, terms, table, sections)
+        for title, seq, reading, score, label, summary, boxes, table, sections in kept:
+            sense = senses[title, seq] = Sense(title, seq, reading, score, label, summary, boxes, table, sections)
             groups[title].append(sense)
-    for title, seq, term in orphans:
+    for title, seq, term, box in orphans:
         if (title, seq) in senses:
-            senses[title, seq].terms.add(term)
+            senses[title, seq].boxes[term] = box
 
     extra_senses = 0
     for title, group in groups.items():

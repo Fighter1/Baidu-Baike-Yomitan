@@ -383,9 +383,214 @@ def test_build_indexes_both_surname_spellings(tmp_path):
     with zipfile.ZipFile(out) as zf:
         rows = json.loads(zf.read("term_bank_1.json"))
     assert [r[0] for r in rows] == ["于荣海", "于榮海", "於榮海", "于是", "於是"]   # 于是 kept as is equals the title
-    assert len({json.dumps(r[5]) for r in rows[:3]}) == 1 and len({r[6] for r in rows[:3]}) == 1
+    assert rows[0][5] == rows[1][5] and rows[3][5] == rows[4][5] and len({r[6] for r in rows[:3]}) == 1
+    # the spelling the entry does not display shows itself after the displayed one; the rest is the same entry
+    assert _boxes(rows[1]) == [("traditional-term", "于榮海"), ("simplified-term", "于荣海")]
+    assert _boxes(rows[2]) == [("traditional-term", "于榮海、於榮海"), ("simplified-term", "于荣海")]
+    assert rows[2][5][0]["content"][1:] == rows[0][5][0]["content"][1:]
     assert flatten_content(rows[0][5][0]).startswith("于榮海于荣海")                # the biography displays the name form
     assert stats["entries"] == 5 and stats["entries_traditional"] == 3
+
+
+def _boxes(row):
+    """The spelling boxes an entry opens with, as (kind, text)."""
+    return [(s["data"]["baike"], s["content"]) for s in row[5][0]["content"][0]["content"]]
+
+
+def test_lookup_only_spellings():
+    t = Traditional("s2tw", ("s2hk", "s2t"))
+    # (indexed and shown, the first displayed; indexed without being shown): Hong Kong's form, then OpenCC's own
+    assert t.spellings("里面", word=True) == (["裡面"], ["裏面"])
+    assert t.spellings("群众") == (["群眾"], ["羣眾", "羣衆"])
+    assert t.spellings("为什么") == (["為什麼"], ["爲什麼"])
+    assert t.spellings("台湾") == (["臺灣"], ["台灣"]) and t.spellings("卫生") == (["衛生"], ["衞生"])
+    assert t.spellings("软件") == (["軟件"], []) and t.spellings("AI") == (["AI"], [])
+    assert t.spellings("着火") == (["著火"], [])                     # s2t keeps 着火, which is the title
+    assert t.forms("里面", word=True) == ["裡面"]                    # what is displayed does not change
+    # off unless asked for, and the displayed standard is no lookup standard of itself
+    assert Traditional("s2tw").spellings("群众") == (["群眾"], [])
+    assert Traditional("s2tw", ("s2tw",)).spellings("群众") == (["群眾"], [])
+    assert Traditional("s2t", ("s2tw", "s2hk")).spellings("群众") == (["羣衆"], ["群眾", "羣眾"])
+    # a name keeps 于 in every standard, under the conditions of the displayed form
+    assert t.spellings("于为群", person=True) == (["于為群", "於為群"], ["于為羣", "於為羣", "于爲羣", "於爲羣"])
+    assert t.spellings("于为群") == (["於為群", "于為群"], ["於為羣", "于為羣", "於爲羣", "于爲羣"])
+    assert t.spellings("于为群", word=True) == (["於為群"], ["於為羣", "於爲羣"])
+    assert t.spellings("于荣海", person=True) == (["于榮海", "於榮海"], [])    # the standards agree on 榮海
+    assert t.spellings("后台") == (["後臺", "后臺"], ["後台"])                 # 后台, its name form, is the title
+
+
+def test_lookup_conversions_are_those_of_opencc(monkeypatch):
+    from opencc import OpenCC
+
+    import baike2yomitan.build as b
+
+    words = ("里面", "群众", "为什么", "台湾", "卫生", "床", "山峰", "说明", "温州", "只有", "才能", "吃饭", "着火",
+             "后台", "面条", "发现", "头发", "一只", "叙述", "化妆", "软件", "AI", "于为群", "天台", "干净", "衹园")
+    hk, st, tw = OpenCC("s2hk"), OpenCC("s2t"), OpenCC("s2tw")
+    want = [(tw.convert(w), (hk.convert(w), st.convert(w))) for w in words]
+    t = Traditional("s2tw", ("s2hk", "s2t"))
+    # the tables were found, so most titles are answered from the displayed form without a conversion
+    assert t._step is not None and all(step is not None for _, step in t._lookup)
+    assert "裡" in t._step[1] and "裏" in t._step[0] and t.may_be_lookup_only("裏面") and not t.may_be_lookup_only("軟件")
+    assert [t._convert(w) for w in words] == want
+    t = Traditional("s2hk", ("s2tw", "s2t"))
+    assert [t._convert(w) for w in words] == [(hk.convert(w), (tw.convert(w), st.convert(w))) for w in words]
+    # an OpenCC laid out differently: every form is converted, and any title may be a lookup spelling
+    monkeypatch.setattr(b, "_variant_step", lambda config, cc: None)
+    t = Traditional("s2tw", ("s2hk", "s2t"))
+    assert [t._convert(w) for w in words] == want and t.may_be_lookup_only("軟件")
+    # a title that comes again is converted once
+    calls = []
+    t = Traditional("s2tw", ("s2hk", "s2t"), repeated={"群众"})
+    monkeypatch.setattr(t._cc, "convert", lambda text, real=t._cc.convert: (calls.append(text), real(text))[1])
+    assert t.spellings("群众") == t.spellings("群众") == (["群眾"], ["羣眾", "羣衆"])
+    assert t.spellings("里面") and t.spellings("里面") and calls == ["群众", "里面", "里面"]
+
+
+def test_parse_lookup():
+    from baike2yomitan.build import parse_lookup
+
+    assert parse_lookup("s2hk,s2t") == ("s2hk", "s2t") and parse_lookup(" s2t , s2t ") == ("s2t",)
+    assert parse_lookup("") == parse_lookup(None) == ()
+    for bad in ("s2twp", "s2hk,hk2s", "yes"):                 # s2twp rewrites vocabulary
+        with pytest.raises(ValueError):
+            parse_lookup(bad)
+
+
+def _lookup_records():
+    return [
+        _primary("里面", 1, "里面，汉语词语，意思是内部，与“外面”相对。"),
+        _primary("群众", 2, "群众，汉语词语，指人民大众或居民的大多数。"),
+        _primary("于为群", 3, "于为群，男，汉族，1960年生，中共党员，大学学历。", tags=["人物"]),
+        _primary("软件", 4, "软件是一系列按照特定顺序组织的计算机数据和指令的集合。"),
+        _primary("后台", 5, "后台，汉语词语，指剧场中在舞台后面的部分。"),
+        _primary("後台", 6, "《後台》是一部描写戏班生活的香港电影。"),
+        _primary("群众", 7, "《群众》是中共江苏省委主办的理论刊物。"),
+    ]
+
+
+def test_build_indexes_lookup_only_spellings(tmp_path):
+    _write(tmp_path / "r.jsonl", _lookup_records())
+    off, on = tmp_path / "off.zip", tmp_path / "on.zip"
+    stats_off = build(str(tmp_path / "r.jsonl"), str(off), traditional="s2tw", revision="2026.11.16.1")
+    stats_on = build(str(tmp_path / "r.jsonl"), str(on), traditional="s2tw", traditional_lookup=("s2hk", "s2t"),
+                     revision="2026.11.16.1")
+    with zipfile.ZipFile(off) as zf:
+        rows_off = json.loads(zf.read("term_bank_1.json"))
+        index_off = zf.read("index.json")
+    with zipfile.ZipFile(on) as zf:
+        rows_on = json.loads(zf.read("term_bank_1.json"))
+        assert zf.read("index.json") == index_off
+    # the title, the displayed form, the name form, then the spellings an entry is only found by
+    assert [r[0] for r in rows_on] == [
+        "里面", "裡面", "裏面",
+        "群众", "群眾", "羣眾", "羣衆",
+        "于为群", "于為群", "於為群", "于為羣", "於為羣", "于爲羣", "於爲羣",
+        "软件", "軟件",
+        "后台", "後臺", "后臺",                  # 後台 is a headword itself: no row for it here
+        "後台", "後臺",
+        "群众", "群眾", "羣眾", "羣衆"]
+    # nothing but rows is added: the build without the option is what is left when they are taken out
+    added = {"裏面", "羣眾", "羣衆", "于為羣", "於為羣", "于爲羣", "於爲羣"}
+    assert [r for r in rows_on if r[0] not in added] == rows_off
+    by_seq = collections.defaultdict(list)
+    for r in rows_on:
+        by_seq[r[6]].append(r)
+    assert len(by_seq) == 7
+    for run in by_seq.values():                 # same reading, score and sequence number as the title's row,
+        for r in run:                           # and the same entry below the spelling boxes
+            assert r[1:5] == run[0][1:5] and r[6:] == run[0][6:]
+            assert r[5][0]["content"][1:] == run[0][5][0]["content"][1:]
+    assert flatten_content(rows_on[0][5][0]).startswith("裡面里面") and "裏面" not in json.dumps(rows_on[0][5], ensure_ascii=False)
+    assert flatten_content(rows_on[7][5][0]).startswith("于為群于为群")       # the biography still displays 于
+    assert "entries_traditional_lookup" not in stats_off and "lookup_spellings_that_are_headwords" not in stats_off
+    assert stats_on["entries_traditional"] == stats_off["entries_traditional"] == 9
+    assert stats_on["entries_traditional_lookup"] == 9 and stats_on["lookup_spellings_that_are_headwords"] == 1
+    assert stats_on["entries"] == stats_off["entries"] + 9 == 7 + 9 + 9
+    # a headword that the build leaves out stands in nobody's way
+    lex = tmp_path / "lex.zip"
+    stats = build(str(tmp_path / "r.jsonl"), str(lex), traditional="s2tw", traditional_lookup=("s2hk", "s2t"),
+                  cedict_words={"后台", "里面"})
+    with zipfile.ZipFile(lex) as zf:
+        assert [r[0] for r in json.loads(zf.read("term_bank_1.json"))] == ["里面", "裡面", "裏面", "后台", "後臺", "後台"]
+    assert stats["entries_traditional_lookup"] == 2 and "lookup_spellings_that_are_headwords" not in stats
+    with pytest.raises(ValueError):             # nothing to go with
+        build(str(tmp_path / "r.jsonl"), str(lex), traditional_lookup=("s2hk",))
+    with pytest.raises(ValueError):
+        build(str(tmp_path / "r.jsonl"), str(lex), traditional="s2tw", traditional_lookup=("s2twp",))
+
+
+def test_a_row_shows_the_spelling_it_was_found_by(tmp_path):
+    recs = _lookup_records()[:3] + [
+        _primary("床", 8, "床是供人躺在上面睡觉的家具。"),                          # Taiwan writes 床 as the title does
+        _primary("于平", 9, "于平，男，汉族，1962年生，中共党员，高级工程师。", tags=["人物"]),   # the name form is the title
+    ]
+    recs[0].infobox = [["中文名", "里面"], ["拼音", "lǐ miàn"]]
+    _write(tmp_path / "r.jsonl", recs)
+    off, on = tmp_path / "off.zip", tmp_path / "on.zip"
+    build(str(tmp_path / "r.jsonl"), str(off), traditional="s2tw", infobox=True)
+    build(str(tmp_path / "r.jsonl"), str(on), traditional="s2tw", traditional_lookup=("s2hk", "s2t"), infobox=True)
+    with zipfile.ZipFile(off) as zf:
+        rows_off = json.loads(zf.read("term_bank_1.json"))
+    with zipfile.ZipFile(on) as zf:
+        rows = json.loads(zf.read("term_bank_1.json"))
+    shown = {"里面": "裡面", "群众": "群眾", "于为群": "于為群", "床": "床", "于平": "于平"}     # what each entry displays
+    box = {r[0]: _boxes(r)[0] for r in rows}                    # the first box of the row of each spelling
+    # a spelling the entry is only found by: the displayed form, then the spelling
+    assert box["裏面"] == ("traditional-term", "裡面、裏面") and _boxes(rows[2])[1] == ("simplified-term", "里面")
+    assert box["羣眾"] == ("traditional-term", "群眾、羣眾") and box["羣衆"] == ("traditional-term", "群眾、羣衆")
+    # the name form that is not displayed, with and without the option, and the lookup spellings of both name forms
+    assert box["於為群"] == ("traditional-term", "于為群、於為群") == _boxes(rows_off[6])[0] and rows_off[6][0] == "於為群"
+    assert [box[t][1] for t in ("于為羣", "於為羣", "于爲羣", "於爲羣")] == [
+        "于為群、于為羣", "于為群、於為羣", "于為群、于爲羣", "于為群、於爲羣"]
+    # the displayed form is the title, so the entry has no traditional box: the row gets one with its own spelling
+    assert [r[0] for r in rows[-4:]] == ["床", "牀", "于平", "於平"]
+    assert [_boxes(r) for r in rows[-4:]] == [
+        [("simplified-term", "床")], [("traditional-term", "牀"), ("simplified-term", "床")],
+        [("simplified-term", "于平")], [("traditional-term", "於平"), ("simplified-term", "于平")]]
+    assert [_boxes(r) for r in rows_off[-3:]] == [
+        [("simplified-term", "床")], [("simplified-term", "于平")], [("traditional-term", "於平"), ("simplified-term", "于平")]]
+    # the row of the title and the row of the displayed form are what structured_content makes, byte for byte
+    by_title = {rec["title"]: rec for rec in iter_records(str(tmp_path / "r.jsonl"))}
+    simplified = None
+    for r in rows:
+        simplified = r[0] if r[0] in by_title else simplified
+        whole = json.dumps([structured_content(by_title[simplified], True, shown[simplified])], ensure_ascii=False)
+        if r[0] in (simplified, shown[simplified]):
+            assert json.dumps(r[5], ensure_ascii=False) == whole
+            assert "、" not in "".join(text for _, text in _boxes(r))
+        else:                                   # only the first box differs; table, summary and footer are the same
+            assert json.dumps(r[5], ensure_ascii=False) != whole and r[5][0]["type"] == "structured-content"
+            assert _boxes(r)[0] == ("traditional-term", (shown[simplified] + "、" if shown[simplified] != simplified else "") + r[0])
+            assert _boxes(r)[1:] == [("simplified-term", simplified)]
+            assert r[5][0]["content"][0]["data"] == {"baike": "terms"}
+            assert json.dumps(r[5][0]["content"][1:], ensure_ascii=False) == json.dumps(json.loads(whole)[0]["content"][1:], ensure_ascii=False)
+    assert any(p["data"]["baike"] == "infobox" for p in rows[2][5][0]["content"])   # 裏面 has the table of 里面
+    # without the option only the name-form rows differ from an entry's other rows
+    assert [r[0] for r in rows_off if r[5] != next(t for t in rows_off if t[6] == r[6])[5]] == ["於為群", "於平"]
+
+
+def test_cli_traditional_lookup(tmp_path, monkeypatch, capsys):
+    from baike2yomitan.cli import main
+
+    monkeypatch.setattr("baike2yomitan.report.STATS_DIR", str(tmp_path / "stats"))
+    _write(tmp_path / "r.jsonl", _lookup_records()[:2])
+    out = tmp_path / "d.zip"
+    common = ["build", "--records", str(tmp_path / "r.jsonl"), "--out", str(out), "--no-validate"]
+    assert main(common + ["--traditional", "s2tw"]) == 0                                    # off by default
+    with zipfile.ZipFile(out) as zf:
+        assert [r[0] for r in json.loads(zf.read("term_bank_1.json"))] == ["里面", "裡面", "群众", "群眾"]
+    assert main(common + ["--traditional", "s2tw", "--traditional-lookup", "s2hk,s2t"]) == 0
+    with zipfile.ZipFile(out) as zf:
+        assert [r[0] for r in json.loads(zf.read("term_bank_1.json"))] == ["里面", "裡面", "裏面", "群众", "群眾", "羣眾", "羣衆"]
+    saved = json.loads((tmp_path / "stats" / "build_d.json").read_text("utf-8"))
+    assert saved["entries_traditional"] == 2 and saved["entries_traditional_lookup"] == 3 and saved["entries"] == 7
+    capsys.readouterr()
+    for args, said in ((["--traditional-lookup", "s2hk,s2t"], "needs --traditional"),
+                       (["--traditional", "s2tw", "--traditional-lookup", "s2twp"], "s2twp")):
+        with pytest.raises(SystemExit):
+            main(common + args)
+        assert said in capsys.readouterr().err
 
 
 def test_tag_exclusion_spares_ordinary_words(tmp_path):

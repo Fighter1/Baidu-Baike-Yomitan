@@ -1188,3 +1188,64 @@ filter by kind; the single characters with an unmerged snapshot; what the
 guard does not rescue, named above; and from the section above the hollow
 brackets that were left on purpose or could not be told apart (175 empty
 ones, 293 with a separator at the end, the ASCII ones).
+
+## Seventh local build, 2026-11-16: lookup-only spellings, and a row that shows its own
+
+Built from the merged records of the sixth build (`build`, not `all`; the
+extraction and the merge did not change), with `--pinyin --traditional s2tw
+--traditional-lookup s2hk,s2t --infobox --sections --revision 2026.11.11.1`
+and for the lexical zip `--cedict … --exclude-tags 人物,企业,学校`. The zips
+in `dist/` and `build_*.json`, `audit_*.json` are from this build.
+
+Two changes, measured one after the other:
+
+1. `--traditional-lookup s2hk,s2t` files an entry under the Hong Kong and the
+   OpenCC spelling as well (裏面 for 裡面, 羣眾 and 羣衆 for 群眾).
+2. A row found by a spelling the entry does not display shows that spelling
+   after the displayed one in the traditional box (裡面、裏面). This also holds
+   for the second name form (于榮海、於榮海), with or without the option.
+
+| | full | lexical |
+|---|---:|---:|
+| rows before | 8,822,128 | 167,395 |
+| lookup-only rows added | 227,132 | 2,240 |
+| senses that got one (1 / 2 / 3 / 4 rows) | 217,662 / 4,694 / 6 / 16 | 2,200 / 20 / 0 / 0 |
+| lookup spellings left out because they are headwords | 107 | 5 |
+| rows that show their own spelling | 256,294 | 2,262 |
+| … name forms, also without the option | 29,162 | 22 |
+| … in a box of their own (the displayed form is the title) | 13,319 | 254 |
+| term banks | 883 → 905 | 17 → 17 |
+| zip, bytes: before | 1,432,181,191 | 36,396,382 |
+| … with the lookup rows | 1,438,006,272 | 36,462,609 |
+| … and with rows showing their own spelling | 1,439,739,617 | 36,476,678 |
+| … without the option, name forms only | 1,432,370,078 | 36,396,483 |
+
+Checks, all on the real zips:
+
+- Option off, before the second change: every zip member has the size and CRC
+  of the sixth build's, and the stats are the same but for the timer.
+- Option on against off: no row lost, none changed, in the same order; every
+  added row has the reading, score, content and sequence number of the row
+  before it; `index.json` and `styles.css` the same.
+- Second change against the build before it, row by row, with and without
+  the option: term, reading, score and sequence the same on every row; the
+  content identical on the rows of the title and the displayed form
+  (8,792,966 and 167,373); on every other row the box is as the rule says and
+  the rest of the entry identical. No row fits neither case.
+- The shortcut that answers the other standards from the Taiwan form gives
+  what three OpenCC conversions give for all 4,799,684 distinct titles.
+- `validate`: both zips pass (the lexical one also with `--validate-mode
+  full`). Golden words: 136 of 136 (full) and 79 of 79 (lexical), 8 lines
+  added. 204 tests.
+
+Build seconds by the build's own timer, without and with the option, two
+runs each: full 793 and 928 against 953 and 1,059; lexical 125 and 113
+against 127 and 113. The machine was 45% slower than on 2026-11-12 (548 s
+then) and two runs of the same build are 135 s apart, so the pairs say no
+more than that the option costs little: over the term-bank pass 7% in the
+first pair, and nothing measurable in the second, where another job ran
+during the first third. Peak memory 2,939 MB without, 2,965 MB with.
+
+**Not checked**: how Yomitan's *Group related terms* mode shows a sense whose
+rows differ in content. From how it merges, the card is expected to repeat
+the article for each lookup spelling.

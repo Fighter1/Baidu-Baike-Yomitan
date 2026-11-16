@@ -54,30 +54,123 @@ SURNAME_FORMS = {
 }
 
 
+# The standards an entry can also be found under (--traditional-lookup).
+# s2twp is not one of them: it rewrites vocabulary, and 软件 would be indexed as 軟體.
+LOOKUP_CONFIGS = ("s2t", "s2tw", "s2hk")
+
+
+def parse_lookup(value: str | None) -> tuple[str, ...]:
+    """'s2hk,s2t' -> ("s2hk", "s2t"); ValueError for anything else than LOOKUP_CONFIGS."""
+    names = tuple(dict.fromkeys(n.strip() for n in (value or "").split(",") if n.strip()))
+    bad = [n for n in names if n not in LOOKUP_CONFIGS]
+    if bad:
+        raise ValueError(f"{', '.join(bad)}: expected a comma-separated list of {', '.join(LOOKUP_CONFIGS)}")
+    return names
+
+
+def _variant_step(config: str, cc) -> tuple[frozenset, frozenset] | None:
+    """s2tw and s2hk are s2t followed by one table that swaps single
+    characters (裏 -> 裡, 臺 -> 台). Returns (the characters that table
+    replaces, the characters it writes), both empty for s2t itself. None for
+    another configuration, or when the installed OpenCC is not laid out this
+    way; no conversion is skipped then."""
+    if config == "s2t":
+        return frozenset(), frozenset()
+    if config not in ("s2tw", "s2hk"):
+        return None
+    try:
+        _s2t, (variants,) = cc._dict_chain_data        # [[phrases, characters], [variants]]
+        table = variants[2]
+        if not table or any(len(key) != 1 for key in table):
+            return None
+        return frozenset(table), frozenset("".join(table.values())) - {" "}
+    except (AttributeError, TypeError, ValueError, IndexError):
+        return None
+
+
 class Traditional:
-    def __init__(self, config: str = "s2t"):
+    """`config` is the standard an entry displays. `lookup` names further
+    standards whose spellings are indexed without being shown. `repeated`:
+    the titles that come more than once; their conversions are kept, so every
+    distinct title is converted once per configuration."""
+
+    def __init__(self, config: str = "s2t", lookup: tuple[str, ...] = (), repeated=()):
         from opencc import OpenCC  # optional dependency
 
         self._cc = OpenCC(config)
+        self._repeated = repeated
+        self._kept: dict[str, tuple[str, tuple[str, ...]]] = {}
+        self._step = _variant_step(config, self._cc)
+        self._lookup = []
+        for name in lookup:
+            if name != config:
+                cc = OpenCC(name)
+                self._lookup.append((cc, _variant_step(name, cc)))
+        steps = [self._step] + [step for _, step in self._lookup]
+        # A spelling can only differ between two standards in a character one of their tables reads or writes.
+        self._marks = None if None in steps else frozenset().union(*(a | b for a, b in steps))
 
     def __call__(self, text: str) -> str:
         return self._cc.convert(text)
 
-    def forms(self, title: str, person: bool = False, word: bool = False) -> list[str]:
-        """Traditional spellings to index for a title; the first is the one
-        the entry displays. Usually one. A title that starts with a character
-        from SURNAME_FORMS gets a second spelling that keeps the name form
+    def _convert(self, title: str) -> tuple[str, tuple[str, ...]]:
+        """(the form of the main standard, the forms of the lookup standards).
+        The main form answers most of the others without a conversion: where
+        it has no character its own table writes, it is the s2t form, and
+        where that has no character another table replaces, it is that
+        standard's form too."""
+        if title in self._kept:
+            return self._kept[title]
+        main = self._cc.convert(title)
+        others: tuple[str, ...] = ()
+        if self._lookup:
+            plain = main if self._step is not None and self._step[1].isdisjoint(main) else None
+            others = tuple(plain if plain is not None and step is not None and step[0].isdisjoint(plain)
+                           else cc.convert(title) for cc, step in self._lookup)
+        if title in self._repeated:
+            self._kept[title] = main, others
+        return main, others
+
+    def spellings(self, title: str, person: bool = False, word: bool = False) -> tuple[list[str], list[str]]:
+        """(the traditional spellings to index, of which the first is the one
+        the entry displays; the spellings to index without showing them).
+
+        The first list usually has one spelling. A title that starts with a
+        character from SURNAME_FORMS gets a second one that keeps the name form
         (於榮海 and 于榮海), because nothing in the title says whether it is a
         name; for a biography the name form is the one displayed. `word`: the
         title is a dictionary word (后边, 干燥剂), which is not a name unless
-        the record is a biography, so it gets no name form."""
-        main = self(title)
-        out = [main]
-        keep = SURNAME_FORMS.get(title[:1])
-        if keep and len(main) == len(title) and main[:1] != keep and (person or not word):
-            name_form = keep + main[1:]
-            out = [name_form, main] if person else [main, name_form]
-        return out
+        the record is a biography, so it gets no name form.
+
+        The second list has the title as the lookup standards write it, each
+        with its name form under the same conditions, leaving out the title
+        itself and whatever the first list has."""
+        main, others = self._convert(title)
+        keep = SURNAME_FORMS.get(title[:1]) if person or not word else None
+
+        def with_name_form(form: str) -> list[str]:
+            if keep and len(form) == len(title) and form[:1] != keep:
+                name_form = keep + form[1:]
+                return [name_form, form] if person else [form, name_form]
+            return [form]
+
+        shown = with_name_form(main)
+        seen = {title, *shown}
+        lookup_only = []
+        for other in others:
+            for form in with_name_form(other):
+                if form not in seen:
+                    seen.add(form)
+                    lookup_only.append(form)
+        return shown, lookup_only
+
+    def forms(self, title: str, person: bool = False, word: bool = False) -> list[str]:
+        """The traditional spellings an entry shows or is named by; see spellings."""
+        return self.spellings(title, person, word)[0]
+
+    def may_be_lookup_only(self, text: str) -> bool:
+        """False when no lookup-only spelling can read like this text."""
+        return self._marks is None or not self._marks.isdisjoint(text)
 
 
 def structured_content(rec: dict, want_infobox: bool, traditional: str | None = None,
@@ -135,6 +228,21 @@ def structured_content(rec: dict, want_infobox: bool, traditional: str | None = 
         parts.append({"tag": "div", "data": {"baike": "footer"},
                       "style": dict(_MUTED, marginTop="0.4em"), "content": footer})
     return {"type": "structured-content", "content": parts}
+
+
+def with_own_spelling(content: dict, shown: str | None, term: str) -> dict:
+    """The entry for a row that is found by a spelling the entry does not show
+    (裏面 for an entry that displays 裡面, or the name form 於榮海 next to 于榮海):
+    the same entry with `term` after the displayed form in the traditional box,
+    裡面、裏面, so whoever looked the spelling up sees it among the forms.
+    `shown` is None when the entry displays no traditional form because it
+    equals the title; the row then gets a box with its own term.
+
+    Only the block of spelling boxes is made anew. Everything under it is the
+    very objects of `content`: sections and info table are not built again."""
+    terms, *rest = content["content"]
+    box = {"tag": "span", "data": {"baike": "traditional-term"}, "content": f"{shown}、{term}" if shown else term}
+    return {**content, "content": [{**terms, "content": [box, terms["content"][-1]]}, *rest]}
 
 
 _REVISION_RE = re.compile(r"^\d+(\.\d+){3}$")
@@ -283,23 +391,50 @@ def build(records_path: str, out_zip: str, title: str | None = None,
           common_words: set[str] | None = None,
           merged: bool | None = None, revision: str | None = None,
           update_base_url: str | None = None, readings_cedict: str | None = None,
-          pinyin_overrides: str | None = OVERRIDES_PATH, sections: bool = False) -> collections.Counter:
+          pinyin_overrides: str | None = OVERRIDES_PATH, sections: bool = False,
+          traditional_lookup: tuple[str, ...] = ()) -> collections.Counter:
     """`pinyin` fills the reading field (see readings.py for the sources);
     `readings_cedict` is the CC-CEDICT export to take readings from and
-    `pinyin_overrides` the hand-checked title/reading file, both optional."""
+    `pinyin_overrides` the hand-checked title/reading file, both optional.
+    `traditional_lookup`: OpenCC standards besides `traditional` under whose
+    spellings an entry is also indexed, without showing them."""
     stats: collections.Counter = collections.Counter()
     t0 = time.time()
     title = title or default_title(cedict_words)
     stem = os.path.splitext(os.path.basename(out_zip))[0]
     revision = check_revision(revision or default_revision())
+    traditional_lookup = parse_lookup(",".join(traditional_lookup))
+    if traditional_lookup and not traditional:
+        raise ValueError("traditional_lookup needs traditional: the lookup spellings go with a traditional headword")
     to_reading = Readings(readings_cedict, pinyin_overrides) if pinyin else None
-    to_trad = Traditional(traditional) if traditional else None
+    repeated: dict = {}                                # filled by pass 1, read by to_trad in pass 2
+    to_trad = Traditional(traditional, traditional_lookup, repeated) if traditional else None
     exclude_tags = set(exclude_tags or ())
     # Titles known to be dictionary words: CC-CEDICT's headwords, when loaded.
     known_words = cedict_words if cedict_words is not None else (to_reading.cedict if to_reading else ())
 
+    def left_out(rec: dict) -> str | None:
+        """Why a record gets no entry, as the name of its counter."""
+        if cedict_words is not None and rec["title"] not in cedict_words:
+            return "skip:not_in_cedict"
+        if exclude_tags and excluded_by_tag(rec, exclude_tags, common_words):
+            return "skip:excluded_tag"
+        return None
+
+    # A lookup-only spelling that is itself a headword gets no row: it is found
+    # as that headword already. Only the titles such a spelling could equal are
+    # remembered, those with a character the standards write differently.
+    own_titles: set[str] = set()
+
+    def visit(rec: dict) -> None:
+        if to_reading:
+            to_reading.observe(rec)
+        if traditional_lookup and to_trad.may_be_lookup_only(rec["title"]) and not left_out(rec):
+            own_titles.add(rec["title"])
+
     print("  [build] pass 1: ranking senses", file=sys.stderr, flush=True)
-    ranks = rank_senses(records_path, visit=to_reading.observe if to_reading else None)
+    ranks = rank_senses(records_path, visit=visit if to_reading or traditional_lookup else None)
+    repeated.update(dict.fromkeys(ranks))
     stats["titles_with_multiple_senses"] = len(ranks)
 
     if merged is None:  # auto-detect: any record carrying an archive snapshot
@@ -313,18 +448,17 @@ def build(records_path: str, out_zip: str, title: str | None = None,
         for rec in iter_records(records_path):
             stats["records_seen"] += 1
             t = rec["title"]
-            if cedict_words is not None and t not in cedict_words:
-                stats["skip:not_in_cedict"] += 1
+            reason = left_out(rec)
+            if reason:
+                stats[reason] += 1
                 continue
             if exclude_tags and exclude_tags & set(rec.get("tags") or []):
-                if excluded_by_tag(rec, exclude_tags, common_words):
-                    stats["skip:excluded_tag"] += 1
-                    continue
                 stats["kept:excluded_tag_on_ordinary_word"] += 1
             rank = ranks.get(t, {}).get(_sense_key(rec), 0)
             score = -rank
             seq += 1
-            forms = to_trad.forms(t, person=_is_biography(rec), word=t in known_words) if to_trad else []
+            forms, lookup_only = (to_trad.spellings(t, person=_is_biography(rec), word=t in known_words)
+                                  if to_trad else ([], []))
             tt = forms[0] if forms else None
             content = structured_content(rec, infobox, tt, sections)
             if sections and any(p["data"]["baike"] == "sections" for p in content["content"]):
@@ -335,13 +469,24 @@ def build(records_path: str, out_zip: str, title: str | None = None,
                 stats["reading:" + reading_source] += 1
             banks.add([t, reading, "", "", score, [content], seq, ""])
             stats["entries"] += 1
+            # The title's row and the displayed form's row carry the entry as it is. Any other row is
+            # found by a spelling the entry does not show, and shows that spelling as well.
+            displayed = tt if tt != t else None
             emitted = {t}
             for form in forms:
                 if form not in emitted:
                     emitted.add(form)
-                    banks.add([form, reading, "", "", score, [content], seq, ""])
+                    own = content if form == tt else with_own_spelling(content, displayed, form)
+                    banks.add([form, reading, "", "", score, [own], seq, ""])
                     stats["entries"] += 1
                     stats["entries_traditional"] += 1
+            for form in lookup_only:                   # after the spellings the entry shows; the audit reads this order
+                if form in own_titles:
+                    stats["lookup_spellings_that_are_headwords"] += 1
+                    continue
+                banks.add([form, reading, "", "", score, [with_own_spelling(content, displayed, form)], seq, ""])
+                stats["entries"] += 1
+                stats["entries_traditional_lookup"] += 1
             if stats["records_seen"] % 500_000 == 0:
                 print(f"  [build] {stats['records_seen']:,} records, {stats['entries']:,} entries, "
                       f"{time.time()-t0:,.0f}s", file=sys.stderr, flush=True)

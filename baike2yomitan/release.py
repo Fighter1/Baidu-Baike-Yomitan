@@ -123,8 +123,12 @@ def _load_stats(stats_dir: str, name: str) -> dict:
 
 
 # A row of the table release_notes writes, and a pin from its "Inputs pinned" line.
+# The lookup-only column is there only for a release built with --traditional-lookup;
+# the size after the term banks ("1,399 MB") is not a number, so a row without the
+# column cannot be read as one with it.
 _NOTES_ROW_RE = re.compile(
-    r"^\| `(?P<file>[^`]+)` \|[^|]*\|[^|]*\| (?P<entries>[\d,]+) \| (?P<traditional>[\d,]+) \| (?P<banks>[\d,]+) \|",
+    r"^\| `(?P<file>[^`]+)` \|[^|]*\|[^|]*\| (?P<entries>[\d,]+) \| (?P<traditional>[\d,]+) \| "
+    r"(?:(?P<lookup>[\d,]+) \| )?(?P<banks>[\d,]+) \|",
     re.M)
 _NOTES_PIN_RE = re.compile(r"`(?P<repo>[^`@\s]+)@(?P<revision>[0-9a-f]{7,40})`")
 MAX_LISTED_COMMITS = 40
@@ -136,28 +140,33 @@ def _delta(now: int, before: int | None) -> str:
     return f"{now:,} ({now - before:+,})" if now != before else f"{now:,} (same)"
 
 
-def changes_since(previous: dict, rows: list[tuple[str, int, int, int]], pins: dict[str, str],
+def changes_since(previous: dict, rows: list[tuple[str, int, int, int, int]], pins: dict[str, str],
                   commits: list[str] | None, repo: str | None = None, tag: str | None = None) -> list[str]:
     """Lines of the "Changes since <tag>" section.
 
     `previous` is the release before this one ({"tagName", "body"}); its body is
     read for the numbers this command wrote there. `rows` are this release's
-    (file, entries, traditional, term banks); `pins` its inputs (repo -> commit);
-    `commits` the subjects of the commits since the previous tag, None when they
-    could not be listed. With `repo` and `tag` (this release's) the section
-    ends with a link to GitHub's comparison of the two tags, like the one
-    GitHub's own release notes carry. A part that cannot be worked out is
-    left out."""
+    (file, entries, traditional, lookup-only, term banks); `pins` its inputs
+    (repo -> commit); `commits` the subjects of the commits since the previous
+    tag, None when they could not be listed. With `repo` and `tag` (this
+    release's) the section ends with a link to GitHub's comparison of the two
+    tags, like the one GitHub's own release notes carry. A part that cannot be
+    worked out is left out.
+
+    The lookup-only column is shown when either release has such entries. A
+    previous release whose table lacks it had none, so it counts as 0 there."""
     prev_tag, body = previous.get("tagName") or "the previous release", previous.get("body") or ""
-    before = {m["file"]: tuple(int(m[k].replace(",", "")) for k in ("entries", "traditional", "banks"))
+    before = {m["file"]: tuple(int((m[k] or "0").replace(",", "")) for k in ("entries", "traditional", "lookup", "banks"))
               for m in _NOTES_ROW_RE.finditer(body)}
     lines = ["", f"## Changes since {prev_tag}", ""]
     if before:
-        lines += ["| file | entries | traditional | term banks |", "|---|---:|---:|---:|"]
-        for name, entries, traditional, banks in rows:
-            old = before.get(name, (None, None, None))
+        with_lookup = any(row[3] for row in rows) or any(old[2] for old in before.values())
+        lines += ["| file | entries | traditional | " + ("lookup-only | " if with_lookup else "") + "term banks |",
+                  "|---|---:|---:|---:|" + ("---:|" if with_lookup else "")]
+        for name, entries, traditional, lookup, banks in rows:
+            old = before.get(name, (None, None, None, None))
             lines.append(f"| `{name}` | {_delta(entries, old[0])} | {_delta(traditional, old[1])} | "
-                         f"{_delta(banks, old[2])} |")
+                         + (f"{_delta(lookup, old[2])} | " if with_lookup else "") + f"{_delta(banks, old[3])} |")
         lines.append("")
     old_pins = {m["repo"]: m["revision"] for m in _NOTES_PIN_RE.finditer(body)}
     if old_pins and pins:
@@ -187,17 +196,23 @@ def release_notes(zips: list[str], indexes: list[dict], stats_dir: str = os.path
     "Changes since" section; `commits` are the commit subjects since its tag,
     `repo` and `tag` (this release's) give it the Full Changelog link."""
     today = today or _dt.date.today()
+    built = [_load_stats(stats_dir, "build_" + zip_stem(z)) for z in zips]
+    # entries indexed under a spelling they do not show (build --traditional-lookup); a column only when there are any
+    with_lookup = any(s.get("entries_traditional_lookup") for s in built)
     lines = [f"Baidu Baike → Yomitan dictionaries, built {today.isoformat()}.", "",
-             "| file | dictionary | revision | entries | traditional | term banks | size |",
-             "|---|---|---|---:|---:|---:|---:|"]
-    rows: list[tuple[str, int, int, int]] = []
-    for z, idx in zip(zips, indexes):
-        s = _load_stats(stats_dir, "build_" + zip_stem(z))
+             "| file | dictionary | revision | entries | traditional | " + ("lookup-only | " if with_lookup else "")
+             + "term banks | size |",
+             "|---|---|---|---:|---:|---:|---:|" + ("---:|" if with_lookup else "")]
+    rows: list[tuple[str, int, int, int, int]] = []
+    for z, idx, s in zip(zips, indexes, built):
         size = s.get("zip_bytes") or (os.path.getsize(z) if os.path.exists(z) else 0)
-        rows.append((os.path.basename(z), s.get("entries", 0), s.get("entries_traditional", 0), s.get("term_banks", 0)))
+        lookup = s.get("entries_traditional_lookup", 0)
+        rows.append((os.path.basename(z), s.get("entries", 0), s.get("entries_traditional", 0), lookup,
+                     s.get("term_banks", 0)))
         lines.append(f"| `{os.path.basename(z)}` | {idx.get('title', '')} | {idx.get('revision', '')} | "
                      f"{s.get('entries', 0):,} | {s.get('entries_traditional', 0):,} | "
-                     f"{s.get('term_banks', 0):,} | {size / 1e6:,.0f} MB |")
+                     + (f"{lookup:,} | " if with_lookup else "")
+                     + f"{s.get('term_banks', 0):,} | {size / 1e6:,.0f} MB |")
     p, h, m = (_load_stats(stats_dir, n) for n in ("extract_563w", "extract_hf", "merge"))
     if p or h or m:
         lines += ["", "Records: primary {:,} · overlay {:,} · merged {:,} (see `data/extract_report.md`).".format(

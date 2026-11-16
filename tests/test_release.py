@@ -259,7 +259,8 @@ Inputs pinned in `data/source-inputs.json`: `lars1234/baidu-baike-dataset@246e64
 
 def test_changes_since_the_previous_release():
     prev = {"tagName": "v2026.11.10.4", "body": PREVIOUS_BODY}
-    rows = [("baike-full.zip", 8813911, 3941241, 882), ("baike-lexical.zip", 159636, 60707, 16), ("baike-mid.zip", 10, 2, 1)]
+    rows = [("baike-full.zip", 8813911, 3941241, 0, 882), ("baike-lexical.zip", 159636, 60707, 0, 16),
+            ("baike-mid.zip", 10, 2, 0, 1)]         # (file, entries, traditional, lookup-only, term banks)
     pins = {"lars1234/baidu-baike-dataset": "246e64b6c441a7d0ea52", "mohamedah/baidu_baike": "ffff00001111aaaa"}
     text = "\n".join(rel.changes_since(prev, rows, pins, ["Fix the merge", "Add the audit"]))
     assert "## Changes since v2026.11.10.4" in text
@@ -281,6 +282,45 @@ def test_changes_since_the_previous_release():
     linked = rel.changes_since({"tagName": "v1", "body": "First release."}, rows[:1], pins, None, repo=REPO, tag="v2")
     assert linked[-1] == f"**Full Changelog**: [v1...v2](https://github.com/{REPO}/compare/v1...v2)"
     assert linked[:3] == ["", "## Changes since v1", ""]
+
+
+def test_lookup_only_column_and_a_previous_release_without_it(tmp_path):
+    stats = {"entries": 9050000, "entries_traditional": 3944651, "entries_traditional_lookup": 227872,
+             "term_banks": 905, "zip_bytes": 1470000000}
+    (tmp_path / "build_baike-full.json").write_text(json.dumps(stats), "utf-8")
+    (tmp_path / "build_baike-lexical.json").write_text(json.dumps(
+        {"entries": 170000, "entries_traditional": 62725, "entries_traditional_lookup": 2605, "term_banks": 17,
+         "zip_bytes": 37000000}), "utf-8")
+    zips, indexes = ["dist/baike-full.zip", "dist/baike-lexical.zip"], [{"title": "F", "revision": "2026.11.16.10"},
+                                                                         {"title": "L", "revision": "2026.11.16.10"}]
+    # the previous release was built before the option existed: its table has no such column
+    old = {"tagName": "v2026.11.10.4", "body": PREVIOUS_BODY}
+    notes = rel.release_notes(zips, indexes, stats_dir=str(tmp_path), previous=old, commits=["Add lookup spellings"])
+    assert "| file | dictionary | revision | entries | traditional | lookup-only | term banks | size |" in notes
+    assert "|---|---|---|---:|---:|---:|---:|---:|" in notes
+    assert "| `baike-full.zip` | F | 2026.11.16.10 | 9,050,000 | 3,944,651 | 227,872 | 905 | 1,470 MB |" in notes
+    assert "| file | entries | traditional | lookup-only | term banks |\n|---|---:|---:|---:|---:|" in notes
+    assert ("| `baike-full.zip` | 9,050,000 (+240,333) | 3,944,651 (+23,759) | 227,872 (+227,872) | 905 (+24) |") in notes
+    assert "| `baike-lexical.zip` | 170,000 (+10,364) | 62,725 (+2,018) | 2,605 (+2,605) | 17 (+1) |" in notes
+    # the release after it reads the new table: every column from its own place
+    after = rel.release_notes(zips, indexes, stats_dir=str(tmp_path), previous={"tagName": "v2026.11.16.10", "body": notes},
+                              commits=[])
+    assert "| `baike-full.zip` | 9,050,000 (same) | 3,944,651 (same) | 227,872 (same) | 905 (same) |" in after
+    assert "| `baike-lexical.zip` | 170,000 (same) | 62,725 (same) | 2,605 (same) | 17 (same) |" in after
+    # built without the option after a release that had it: the main table has no column, the comparison keeps it
+    for name in ("build_baike-full.json", "build_baike-lexical.json"):
+        saved = json.loads((tmp_path / name).read_text("utf-8"))
+        saved["entries"] -= saved.pop("entries_traditional_lookup")
+        (tmp_path / name).write_text(json.dumps(saved), "utf-8")
+    off = rel.release_notes(zips, indexes, stats_dir=str(tmp_path), previous={"tagName": "v2026.11.16.10", "body": notes},
+                            commits=[])
+    assert "| file | dictionary | revision | entries | traditional | term banks | size |" in off
+    assert "| `baike-full.zip` | F | 2026.11.16.10 | 8,822,128 | 3,944,651 | 905 | 1,470 MB |" in off
+    assert "| `baike-full.zip` | 8,822,128 (-227,872) | 3,944,651 (same) | 0 (-227,872) | 905 (same) |" in off
+    # neither release has such entries: the tables are the ones from before the option
+    plain = rel.release_notes(zips, indexes, stats_dir=str(tmp_path), previous=old, commits=[])
+    assert "lookup-only" not in plain
+    assert "| `baike-full.zip` | 8,822,128 (+12,461) | 3,944,651 (+23,759) | 905 (+24) |" in plain
 
 
 def test_release_notes_get_the_changes_section(built_zip, monkeypatch, tmp_path):
