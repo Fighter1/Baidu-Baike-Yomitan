@@ -950,7 +950,11 @@ with the same number of segments, which is why the builder always writes four:
 as `N`). `--revision` overrides it and must also have four segments: Yomitan
 falls back to a plain string comparison when the segment counts differ, so an
 installed `2026.11.9` would never be offered `2026.11.10.5`. The builder, the
-command line and the workflow all reject anything else.
+command line and the workflow all reject anything else. The workflow also
+refuses a revision whose tag `v<revision>` exists already, with or without a
+release, and one that is not greater than the latest release's, number by
+number: Yomitan would offer that one to nobody. A date plus the run number
+passes both by itself; they are there for a revision typed in by hand.
 
 GitHub's `…/releases/latest/download/<asset>` URL always points at the newest
 non-draft release, so it is a stable target for both fields. The flow:
@@ -1020,7 +1024,15 @@ Three workflows under `.github/workflows/`:
 |---|---|---|
 | `tests.yml` | every push to `main`, every pull request | installs requirements on Python 3.11 and 3.12, runs pytest (fixtures only, no corpus), builds a one-entry zip with this repository's update URLs and runs `release --dry-run` on it |
 | `upstream-check.yml` | Mondays 06:00 UTC, or manually | runs `inputs pin`; if a dataset commit changed, pushes branch `upstream-inputs` and opens (or refreshes) a pull request with the manifest diff. Downloads nothing |
-| `build-release.yml` | manual only (*Actions → Build and release → Run workflow*) | frees runner disk, downloads the pinned corpora, runs `all` with `--update-url github` and revision `UTC-date.run-number`, uploads the reports as an artifact and publishes the release as *latest*, tagged at the commit that was built. Inputs: `publish` (off keeps the zips as a 7-day artifact instead), `skip_validation`, `revision` (four integers) |
+| `build-release.yml` | manual only (*Actions → Build and release → Run workflow*) | checks the revision, frees runner disk, downloads the pinned corpora, runs `all` with `--update-url github` and revision `UTC-date.run-number`, uploads the reports as an artifact and publishes the release as *latest*, tagged at the commit that was built. Inputs: `publish` (off keeps the zips as a 7-day artifact instead), `skip_validation`, `revision` (four integers) |
+
+`build-release.yml` stops in its first seconds, before anything is downloaded,
+when it is asked to publish from a branch other than the default one, when
+the tag `v<revision>` exists already, or when the revision is not greater
+than the latest release's. The last two also hold for a build-only run. A run
+whose publish step failed after the tag was made cannot be started again as
+it is, because its run number and so its revision stay the same; start a new
+run.
 
 Nothing is published unless the build step succeeds, and it fails when
 validation, the smoke test or a golden-word check fails. (Until 2026-11-10 the
